@@ -176,18 +176,151 @@ def load_anchor_pil(anchor_rel_path: str, width: int, height: int):
     return img
 
 
-def find_existing_hd_segment(workspace_dir: str, current_segments_dir: str, shot_id: int) -> str | None:
-    """检查当前目录或 Wan14B_720P 目录中是否已有渲染好的高清分镜，避免浪费已渲染镜头"""
+def find_existing_hd_segment(segment_dirs: list[str], shot_id: int) -> str | None:
+    """仅在当前项目自己的分镜目录中查找已渲染分镜（不同项目之间绝不串用），避免浪费已渲染镜头"""
     filename = f"shot_{shot_id:03d}.mp4"
-    candidates = [
-        os.path.join(current_segments_dir, filename),
-        os.path.join(workspace_dir, "outputs", "Deep_Sea_Odyssey_90s_Wan14B_720P", "segments", filename),
-        os.path.join(workspace_dir, "outputs", "Deep_Sea_Odyssey_90s_HD_I2V", "segments", filename),
-    ]
-    for c in candidates:
+    for d in segment_dirs:
+        c = os.path.join(d, filename)
         if os.path.exists(c) and os.path.getsize(c) > 50_000:
             return c
     return None
+
+
+def project_segment_dirs(storyboard: dict, workspace_dir: str) -> list[str]:
+    """返回当前项目的 LTX 与 Wan 分镜目录"""
+    title = storyboard.get("title", "Deep_Sea_Odyssey_90s_HD_I2V")
+    wan_title = storyboard.get("wan_title", f"{title}_Wan14B_720P")
+    return [
+        os.path.join(workspace_dir, "outputs", wan_title, "segments"),
+        os.path.join(workspace_dir, "outputs", title, "segments"),
+    ]
+
+
+def generate_soundtrack(storyboard: dict, duration_sec: float, output_wav_path: str):
+    """按 storyboard 的 bgm_style 选择配乐风格"""
+    style = storyboard.get("bgm_style", "deep_sea_ambient_symphony")
+    if style == "emotional_piano":
+        return generate_emotional_piano_soundtrack(duration_sec, output_wav_path)
+    return generate_deep_sea_soundtrack(duration_sec, output_wav_path)
+
+
+def generate_emotional_piano_soundtrack(duration_sec: float, output_wav_path: str, sample_rate: int = 44100):
+    """
+    合成温情钢琴 + 弦乐铺底的动画短片纯配乐 (无配音)，情绪随四幕起伏:
+    第一幕 温暖明亮 (C大调) → 第二幕 稀疏低沉 (A小调, 渐弱) → 第三幕 希望回归 (渐强) → 第四幕 弦乐升华 + 尾声淡出
+    """
+    import numpy as np
+
+    print(f"🎹 正在合成 {duration_sec:.1f} 秒温情钢琴纯配乐 (无配音): {output_wav_path}")
+    sr = sample_rate
+    n = int(duration_sec * sr)
+    left = np.zeros(n, dtype=np.float32)
+    right = np.zeros(n, dtype=np.float32)
+
+    def midi(m):
+        return 440.0 * 2 ** ((m - 69) / 12.0)
+
+    def piano_note(freq, dur, vel):
+        length = int(dur * sr)
+        tt = np.arange(length, dtype=np.float32) / sr
+        env = (1 - np.exp(-tt * 200)) * np.exp(-tt * (1.6 + freq / 900.0))
+        tone = (
+            np.sin(2 * np.pi * freq * tt)
+            + 0.45 * np.sin(2 * np.pi * 2 * freq * tt) * np.exp(-tt * 2.5)
+            + 0.22 * np.sin(2 * np.pi * 3 * freq * tt) * np.exp(-tt * 4.0)
+            + 0.08 * np.sin(2 * np.pi * 4.01 * freq * tt) * np.exp(-tt * 6.0)
+        )
+        return (vel * env * tone).astype(np.float32)
+
+    def add(sig, start_s, pan):
+        s = int(start_s * sr)
+        if s >= n:
+            return
+        e = min(n, s + len(sig))
+        left[s:e] += sig[: e - s] * (1 - pan)
+        right[s:e] += sig[: e - s] * pan
+
+    # 四幕和弦进行 (MIDI 根音 + 和弦音)，每个和弦 2.5 秒 (≈ 每 5 秒镜头 2 个和弦)
+    act_progressions = [
+        [(48, [60, 64, 67]), (43, [59, 62, 67]), (45, [60, 64, 69]), (41, [60, 65, 69])],   # I: C G Am F
+        [(45, [60, 64, 69]), (41, [60, 65, 69]), (36, [60, 64, 67]), (43, [59, 62, 67])],   # II: Am F C G
+        [(41, [60, 65, 69]), (43, [62, 67, 71]), (45, [60, 64, 69]), (40, [59, 64, 67])],   # III: F G Am Em
+        [(41, [60, 65, 69]), (43, [62, 67, 71]), (48, [64, 67, 72]), (48, [64, 67, 72])],   # IV: F G C C
+    ]
+    act_dyn = [0.85, 0.55, 0.75, 1.0]
+    melody_by_act = [
+        [76, 74, 72, 74, 76, 79, 77, 76],
+        [72, 71, 69, 0, 67, 69, 71, 0],
+        [69, 71, 72, 74, 76, 74, 72, 71],
+        [77, 76, 74, 76, 79, 84, 83, 84],
+    ]
+
+    chord_len = 2.5
+    act_len = duration_sec / 4.0
+    t_cursor = 0.0
+    chord_idx = 0
+    while t_cursor < duration_sec - 0.5:
+        act = min(3, int(t_cursor // act_len))
+        root, chord = act_progressions[act][chord_idx % 4]
+        dyn = act_dyn[act]
+        # 低音
+        add(piano_note(midi(root), 3.5, 0.32 * dyn), t_cursor, 0.45)
+        # 分解和弦 (八分音符)
+        arp = [chord[0], chord[1], chord[2], chord[1] + 12, chord[2], chord[1]]
+        step = chord_len / len(arp)
+        sparse = act == 1
+        for k, m in enumerate(arp):
+            if sparse and k % 2 == 1:
+                continue
+            add(piano_note(midi(m), 2.2, 0.16 * dyn), t_cursor + k * step, 0.35 + 0.3 * (k / len(arp)))
+        # 旋律 (每和弦 2 个音)
+        mel = melody_by_act[act]
+        for j in range(2):
+            m = mel[(chord_idx * 2 + j) % len(mel)]
+            if m:
+                add(piano_note(midi(m), 2.6, 0.24 * dyn), t_cursor + j * chord_len / 2, 0.6)
+        # 弦乐铺底 (第三幕后半段起逐渐加入)
+        if t_cursor > act_len * 2.5:
+            seg = int(chord_len * sr)
+            tt = np.arange(seg, dtype=np.float32) / sr
+            swell = min(1.0, (t_cursor - act_len * 2.5) / (act_len * 0.8))
+            pad = np.zeros(seg, dtype=np.float32)
+            for m in [root + 12] + chord:
+                f = midi(m)
+                vib = 1 + 0.003 * np.sin(2 * np.pi * 5.2 * tt)
+                pad += np.sin(2 * np.pi * f * vib * tt) + 0.3 * np.sin(2 * np.pi * 2 * f * tt)
+            fade = np.minimum(1.0, np.minimum(tt / 0.6, (chord_len - tt) / 0.6)).astype(np.float32)
+            add(0.035 * swell * pad * fade, t_cursor, 0.5)
+        t_cursor += chord_len
+        chord_idx += 1
+
+    # 简单混响 (多抽头延迟)
+    for delay_s, g in [(0.031, 0.35), (0.067, 0.28), (0.113, 0.22), (0.171, 0.16), (0.257, 0.1)]:
+        d = int(delay_s * sr)
+        left[d:] += g * right[:-d].copy()
+        right[d:] += g * left[:-d].copy()
+
+    in_s = min(int(2.0 * sr), n // 4)
+    out_s = min(int(6.0 * sr), n // 4)
+    env = np.ones(n, dtype=np.float32)
+    env[:in_s] = np.linspace(0, 1, in_s, dtype=np.float32)
+    env[-out_s:] = np.linspace(1, 0, out_s, dtype=np.float32)
+    left *= env
+    right *= env
+
+    peak = max(float(np.max(np.abs(left))), float(np.max(np.abs(right))), 1e-6)
+    pcm = np.empty((n, 2), dtype=np.int16)
+    pcm[:, 0] = (left / peak * 0.85 * 32767).astype(np.int16)
+    pcm[:, 1] = (right / peak * 0.85 * 32767).astype(np.int16)
+
+    os.makedirs(os.path.dirname(os.path.abspath(output_wav_path)), exist_ok=True)
+    with wave.open(output_wav_path, "wb") as wf:
+        wf.setnchannels(2)
+        wf.setsampwidth(2)
+        wf.setframerate(sr)
+        wf.writeframes(pcm.tobytes())
+    print(f"✅ 温情钢琴纯配乐合成完成: {output_wav_path}")
+    return output_wav_path
 
 
 def concat_videos_with_bgm_ffmpeg(
@@ -196,6 +329,7 @@ def concat_videos_with_bgm_ffmpeg(
     bgm_wav_path: str | None = None,
     target_width: int = 1280,
     target_height: int = 704,
+    norm_dir: str | None = None,
 ):
     """
     使用 FFmpeg filter_complex 将多个 5 秒分镜统一通过 Lanczos 超分至 1280x704 (720P) 24fps，
@@ -203,7 +337,7 @@ def concat_videos_with_bgm_ffmpeg(
     """
     list_file = os.path.join(os.path.dirname(final_output_path), "concat_list.txt")
     normalized_segments = []
-    norm_dir = os.path.join(os.path.dirname(final_output_path), "_norm_720p")
+    norm_dir = norm_dir or os.path.join(os.path.dirname(final_output_path), "_norm_720p")
     os.makedirs(norm_dir, exist_ok=True)
 
     for idx, seg in enumerate(segment_paths, start=1):
@@ -332,7 +466,7 @@ def run_ltx_pipeline(storyboard: dict, workspace_dir: str, force_rerun: bool = F
         act_name = shot.get("act", "")
         seg_path = os.path.join(segments_dir, f"shot_{shot_id:03d}.mp4")
 
-        existing_seg = None if force_rerun else find_existing_hd_segment(workspace_dir, segments_dir, shot_id)
+        existing_seg = None if force_rerun else find_existing_hd_segment(project_segment_dirs(storyboard, workspace_dir), shot_id)
         if existing_seg:
             print(f"⏭️ [镜头 {idx}/{len(shots)}] ({act_name}) 复用已渲染的高清分镜: {existing_seg}")
             segment_files.append(existing_seg)
@@ -384,10 +518,11 @@ def run_ltx_pipeline(storyboard: dict, workspace_dir: str, force_rerun: bool = F
     bgm_wav = None
     if storyboard.get("bgm_enabled", True):
         bgm_wav = os.path.join(workspace_dir, "outputs", title, f"{title}_bgm_{total_duration}s.wav")
-        generate_deep_sea_soundtrack(float(total_duration), bgm_wav)
+        generate_soundtrack(storyboard, float(total_duration), bgm_wav)
 
     final_output = os.path.join(workspace_dir, "outputs", f"{title}_full_{total_duration}s.mp4")
-    concat_videos_with_bgm_ffmpeg(segment_files, final_output, bgm_wav_path=bgm_wav, target_width=1280, target_height=704)
+    concat_videos_with_bgm_ffmpeg(segment_files, final_output, bgm_wav_path=bgm_wav, target_width=1280, target_height=704,
+                                  norm_dir=os.path.join(workspace_dir, "outputs", title, "_norm_720p"))
     return final_output
 
 
@@ -464,7 +599,7 @@ def run_wan_i2v_pipeline(
 
     global_style = storyboard.get("global_style", "")
     negative_prompt = storyboard.get("negative_prompt", "blurry, out of focus, low quality, worst quality")
-    title = "Deep_Sea_Odyssey_90s_Wan14B_720P"
+    title = storyboard.get("wan_title", f"{storyboard.get('title', 'Deep_Sea_Odyssey_90s')}_Wan14B_720P")
 
     segments_dir = os.path.join(workspace_dir, "outputs", title, "segments")
     os.makedirs(segments_dir, exist_ok=True)
@@ -483,7 +618,7 @@ def run_wan_i2v_pipeline(
         act_name = shot.get("act", "")
         seg_path = os.path.join(segments_dir, f"shot_{shot_id:03d}.mp4")
 
-        existing_seg = None if force_rerun else find_existing_hd_segment(workspace_dir, segments_dir, shot_id)
+        existing_seg = None if force_rerun else find_existing_hd_segment(project_segment_dirs(storyboard, workspace_dir), shot_id)
         if existing_seg:
             print(f"⏭️ [镜头 {idx}/{len(shots)}] ({act_name}) 已存在于云盘，自动复用 (绝不重复渲染): {existing_seg}")
             segment_files.append(existing_seg)
@@ -522,10 +657,11 @@ def run_wan_i2v_pipeline(
     bgm_wav = None
     if storyboard.get("bgm_enabled", True):
         bgm_wav = os.path.join(workspace_dir, "outputs", title, f"{title}_bgm_{total_duration}s.wav")
-        generate_deep_sea_soundtrack(float(total_duration), bgm_wav)
+        generate_soundtrack(storyboard, float(total_duration), bgm_wav)
 
     final_output = os.path.join(workspace_dir, "outputs", f"{title}_full_{total_duration}s.mp4")
-    concat_videos_with_bgm_ffmpeg(segment_files, final_output, bgm_wav_path=bgm_wav, target_width=1280, target_height=704)
+    concat_videos_with_bgm_ffmpeg(segment_files, final_output, bgm_wav_path=bgm_wav, target_width=1280, target_height=704,
+                                  norm_dir=os.path.join(workspace_dir, "outputs", title, "_norm_720p"))
     return final_output
 
 
@@ -558,7 +694,7 @@ def main():
     total_sec = len(storyboard.get("shots", [])) * storyboard.get("segment_seconds", 5)
 
     if args.bgm_only:
-        generate_deep_sea_soundtrack(float(total_sec), args.bgm_only)
+        generate_soundtrack(storyboard, float(total_sec), args.bgm_only)
         return
 
     workspace_dir = os.getcwd()

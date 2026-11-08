@@ -1,0 +1,46 @@
+{
+  "title": "Paper_Planes_120s",
+  "wan_title": "Paper_Planes_120s_Wan14B_720P",
+  "engine": "wan-fast",
+  "resolution": {
+    "width": 1280,
+    "height": 704
+  },
+  "fps": 24,
+  "segment_seconds": 5,
+  "num_inference_steps": 20,
+  "bgm_enabled": true,
+  "bgm_style": "emotional_piano",
+  "voiceover_enabled": false,
+  "global_style": "Pixar style 3D animated feature film, warm cinematic lighting, soft global illumination, expressive characters, smooth gentle character animation, stable consistent faces, natural subtle motion, high detail, film grain-free clean render",
+  "negative_prompt": "blurry, low quality, worst quality, deformed face, distorted hands, extra fingers, extra limbs, morphing, flickering, jitter, sudden scene change, text, subtitles, watermark, logo, photorealistic live action",
+  "shots": [
+    {"id": 1, "duration": 5, "anchor_image": "projects/paper_planes/keyframes/shot_001.jpg", "act": "第一幕·温暖 (0-30s)", "prompt": "Slow cinematic push-in over a colorful seaside town at sunrise, a white paper plane gliding gently across the sky toward a grassy hill with a big old oak tree, sea sparkling, lighthouse on the cliff"},
+    {"id": 2, "duration": 5, "anchor_image": "projects/paper_planes/keyframes/shot_002.jpg", "act": "第一幕·温暖 (0-30s)", "prompt": "Grandpa carefully folds a white paper plane at the wooden kitchen table, creasing the wings with his fingers, the little girl watches with sparkling eyes and wiggles excitedly, warm morning light"},
+    {"id": 3, "duration": 5, "anchor_image": "projects/paper_planes/keyframes/shot_003.jpg", "act": "第一幕·温暖 (0-30s)", "prompt": "The little girl happily pulls grandpa by the hand up the flowery green hill, both walking forward, her red scarf and the grass swaying in the breeze, camera tracking alongside"},
+    {"id": 4, "duration": 5, "anchor_image": "projects/paper_planes/keyframes/shot_004.jpg", "act": "第一幕·温暖 (0-30s)", "prompt": "The paper plane soars away over the sea toward the lighthouse, the girl jumps with joy and points, grandpa laughs and claps his hands, wind blowing her scarf and the tall grass"},
+    {"id": 5, "duration": 5, "anchor_image": "projects/paper_planes/keyframes/shot_005.jpg", "act": "第一幕·温暖 (0-30s)", "prompt": "Grandpa draws a little heart on the paper plane wing with a pencil, the girl giggles and leans closer, leaves rustling, dappled sunlight flickering softly over them"},
+    {"id": 6, "duration": 5, "anchor_image": "projects/paper_planes/keyframes/shot_006.jpg", "act": "第一幕·温暖 (0-30s)", "prompt": "Grandpa and the girl sit together under the oak tree watching dozens of paper planes drift slowly across the glowing sunset sky, grandpa gently wraps his arm around her, leaves sway"},
+
+    {"id": 7, "duration": 5, "anchor_image": "projects/paper_planes/keyframes/shot_007.jpg", "act": "第二幕·离别 (30-60s)", "prompt": "Grandpa walks slowly with his wooden cane on the autumn hill path, the girl holds his hand and looks up at him worriedly, orange leaves falling and swirling around them"},
+    {"id": 8, "duration": 5, "anchor_image": "projects/paper_planes/keyframes/shot_008.jpg", "act": "第二幕·离别 (30-60s)", "prompt": "Raindrops stream down the window glass, the girl presses her small hand on the window and gazes sadly toward the distant hill, grandpa breathes slowly asleep in the armchair behind her"},
+    {"id": 9, "duration": 5, "anchor_image": "projects/paper_planes/keyframes/shot_009.jpg", "act": "第二幕·离别 (30-60s)", "prompt": "In the quiet hospital room grandpa slowly folds a small paper plane with trembling careful hands and smiles tenderly at the sleeping girl beside him, warm dusk light"},
+    {"id": 10, "duration": 5, "anchor_image": "projects/paper_planes/keyframes/shot_010.jpg", "act": "第二幕·离别 (30-60s)", "prompt": "The old wrinkled hand gently squeezes the small child's hand, the tiny paper plane rests between them, golden light slowly fades, very subtle tender motion"},
+    {"id": 11, "duration": 5, "anchor_image": "projects/paper_planes/keyframes/shot_011.jpg", "act": "第二幕·离别 (30-60s)", "prompt": "Very slow push-in on the empty armchair with grandpa's flat cap and glasses, dust particles drifting slowly in the pale light beam, silent and still"},
+    {"id": 12, "duration": 5, "anchor_image": "projects/paper_planes/keyframes/shot_012.jpg", "act": "第二幕·离别 (30-60s)", "prompt": "Snow falls gently on the lonely hilltop, the girl stands under the bare oak tree hugging the paper plane to her chest, a tear rolls down her cheek, slow pull-back camera"},
+
+    {"id": 13, "duration": 5, "anchor_image": "projects/paper_planes/keyframes/shot_013.jpg", "act": "第三幕·礼物 (60-90s)", "prompt": "In the attic the girl slowly pulls the red ribbon to untie the old wooden box, dust sparkles drifting in the warm sunbeam, her face lights up with curiosity"},
+    {"id": 14, "duration": 5, "anchor_image": "projects/paper_planes/keyframes/shot_014.jpg", "act": "第三幕·礼物 (60-90s)", "prompt": "Small hands gently lift colorful paper planes out of the old wooden box, the paper planes shift softly, warm attic light glowing, slow overhead camera"},
+    {"id": 15, "duration": 5, "anchor_image": "projects/paper_planes/keyframes/shot_015.jpg", "act": "第三幕·礼物 (60-90s)", "prompt": "The girl looks at grandpa's crayon drawing, tears glistening, then a warm smile slowly spreads across her face, she hugs the paper to her chest"},
+    {"id": 16, "duration": 5, "anchor_image": "projects/paper_planes/keyframes/shot_016.jpg", "act": "第三幕·礼物 (60-90s)", "prompt": "The teenage girl throws a colorful paper plane into the blue sky under the blossoming tree, pink petals swirl in the wind, her ponytail and scarf flutter, planes glide away"},
+    {"id": 17, "duration": 5, "anchor_image": "projects/paper_planes/keyframes/shot_017.jpg", "act": "第三幕·礼物 (60-90s)", "prompt": "The young woman in graduation gown raises the paper plane toward the sunset sky, smiling through happy tears, the tassel of her cap swaying in the breeze, leaves rustle"},
+    {"id": 18, "duration": 5, "anchor_image": "projects/paper_planes/keyframes/shot_018.jpg", "act": "第三幕·礼物 (60-90s)", "prompt": "At night under the warm desk lamp the young woman holds the last paper plane to her heart with eyes closed, breathing softly, a gentle smile, moonlight and lamp glow"},
+
+    {"id": 19, "duration": 5, "anchor_image": "projects/paper_planes/keyframes/shot_019.jpg", "act": "第四幕·传承 (90-120s)", "prompt": "The mother and her little son walk hand in hand up the flowery hill path toward the big oak tree, the boy swings his paper plane happily, flowers sway, camera slowly follows"},
+    {"id": 20, "duration": 5, "anchor_image": "projects/paper_planes/keyframes/shot_020.jpg", "act": "第四幕·传承 (90-120s)", "prompt": "The mother folds a white paper plane at the kitchen table creasing its wings, her son watches with sparkling eyes and wiggles excitedly, grandpa's cap hangs on the wall, warm morning light"},
+    {"id": 21, "duration": 5, "anchor_image": "projects/paper_planes/keyframes/shot_021.jpg", "act": "第四幕·传承 (90-120s)", "prompt": "The paper plane soars away toward the lighthouse, the boy jumps and points with joy, his mother laughs and claps her hands, golden wind sweeping the tall grass"},
+    {"id": 22, "duration": 5, "anchor_image": "projects/paper_planes/keyframes/shot_022.jpg", "act": "第四幕·传承 (90-120s)", "prompt": "The white paper plane glides higher and higher into the glowing golden clouds, sun rays shimmering through, birds flying alongside, slow upward camera tilt, heavenly and serene"},
+    {"id": 23, "duration": 5, "anchor_image": "projects/paper_planes/keyframes/shot_023.jpg", "act": "第四幕·传承 (90-120s)", "prompt": "The mother and son sit together under the oak tree watching colorful paper planes drift across the sunset sky, she wraps her arm around him, leaves sway gently"},
+    {"id": 24, "duration": 5, "anchor_image": "projects/paper_planes/keyframes/shot_024.jpg", "act": "第四幕·传承 (90-120s)", "prompt": "Final slow pull-back wide shot at dusk, the paper plane glides toward the setting sun leaving a golden trail, the lighthouse beam glows, stars twinkle, silhouettes under the oak tree, peaceful ending"}
+  ]
+}
