@@ -476,6 +476,11 @@ def run_wan_i2v_pipeline(storyboard: dict, workspace_dir: str, force_rerun: bool
 
 
 def main():
+    # 自动切换到脚本所在的云盘工作区目录 (/content/drive/MyDrive/Antigravity_Workspace)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    if os.path.exists(script_dir):
+        os.chdir(script_dir)
+
     parser = argparse.ArgumentParser(description="90秒深海探索纪录片 720P 高清图生视频 (I2V) 流水线")
     parser.add_argument("--storyboard", type=str, default="storyboard.json", help="分镜剧本 JSON 路径")
     parser.add_argument("--engine", type=str, choices=["ltx", "wan-i2v"], default=None, help="模型引擎: wan-i2v (14B旗舰720P I2V) 或 ltx (快速720P I2V)")
