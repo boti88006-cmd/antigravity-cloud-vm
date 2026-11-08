@@ -359,13 +359,26 @@ def run_wan_i2v_pipeline(storyboard: dict, workspace_dir: str, force_rerun: bool
     使用阿里通义万相 Wan-AI/Wan2.1-I2V-14B-720P-Diffusers (140亿参数 720P 旗舰图生视频大模型)
     专为 95GB RTX PRO 6000 Blackwell 打造！
     """
+    import sys
+    try:
+        import ftfy  # noqa: F401
+    except ImportError:
+        print("📦 正在自动安装 Wan2.1 文本清洗依赖 ftfy...")
+        subprocess.run([sys.executable, "-m", "pip", "install", "-q", "ftfy", "regex"], check=True)
+
     import torch
     from diffusers import AutoencoderKLWan, WanImageToVideoPipeline
     from diffusers.utils import export_to_video
     from transformers import CLIPVisionModel
 
+    # 自动释放之前 LTX-Video 占用的 28.4GB 本地 SSD 缓存，确保 14B 旗舰模型拥有充足本地 NVMe 空间
+    ltx_cache_dir = os.path.join(os.environ.get("HF_HOME", "/content/hf_cache"), "hub", "models--Lightricks--LTX-Video")
+    if os.path.exists(ltx_cache_dir):
+        print("🧹 正在清理旧的 LTX-Video 本地缓存以释放 28.4GB NVMe 空间供 Wan2.1-14B 使用...")
+        shutil.rmtree(ltx_cache_dir, ignore_errors=True)
+
     model_id = "Wan-AI/Wan2.1-I2V-14B-720P-Diffusers"
-    print(f"🚀 正在加载通义万相 14B 720P 旗舰图生视频模型: {model_id}...")
+    print(f"🚀 正在加载阿里通义万相 14B 720P 旗舰图生视频模型: {model_id}...")
 
     image_encoder = CLIPVisionModel.from_pretrained(model_id, subfolder="image_encoder", torch_dtype=torch.float32)
     vae = AutoencoderKLWan.from_pretrained(model_id, subfolder="vae", torch_dtype=torch.float32)
@@ -375,22 +388,29 @@ def run_wan_i2v_pipeline(storyboard: dict, workspace_dir: str, force_rerun: bool
         image_encoder=image_encoder,
         torch_dtype=torch.bfloat16,
     )
+    if hasattr(pipe.vae, "enable_tiling"):
+        pipe.vae.enable_tiling()
 
     vram_gb = torch.cuda.get_device_properties(0).total_memory / (1024 ** 3) if torch.cuda.is_available() else 0
+    print(f"🖥️ 检测到 GPU: {torch.cuda.get_device_name(0)} (显存: {vram_gb:.1f} GB)")
     if vram_gb >= 45.0:
-        print("⚡ 95GB Blackwell 显存充裕，启用 Wan2.1-14B 全量 CUDA 直通加速！")
+        print("⚡ 95GB Blackwell 显存充裕，启用 Wan2.1-14B-720P 全量 CUDA 直通加速 (pipe.to('cuda'))！")
         pipe.to("cuda")
     else:
         pipe.enable_model_cpu_offload()
 
-    width = 1280
-    height = 720
+    width = storyboard.get("resolution", {}).get("width", 1280)
+    height = storyboard.get("resolution", {}).get("height", 704)
+    # 确保宽高为 16 的整数倍
+    width = (width // 16) * 16
+    height = (height // 16) * 16
     fps = 16
     seg_sec = storyboard.get("segment_seconds", 5)
-    num_frames = 81  # 5s @ 16fps
+    num_frames = 81  # 5s @ 16fps 标准帧数
+    steps = storyboard.get("num_inference_steps", 40)
 
     global_style = storyboard.get("global_style", "")
-    negative_prompt = storyboard.get("negative_prompt", "")
+    negative_prompt = storyboard.get("negative_prompt", "blurry, out of focus, low quality, worst quality")
     title = "Deep_Sea_Odyssey_90s_Wan14B_720P"
 
     segments_dir = os.path.join(workspace_dir, "outputs", title, "segments")
@@ -400,20 +420,30 @@ def run_wan_i2v_pipeline(storyboard: dict, workspace_dir: str, force_rerun: bool
     total_duration = len(shots) * seg_sec
     segment_files = []
 
+    print(
+        f"🌊 开始使用 Wan2.1-I2V-14B-720P 渲染高清图生视频纪录片《{title}》:\n"
+        f"   分辨率: {width}x{height} (720P HD) | 帧数: {num_frames} | 共 {len(shots)} 个镜头 ({total_duration}s)"
+    )
+
     for idx, shot in enumerate(shots, start=1):
         shot_id = shot.get("id", idx)
+        act_name = shot.get("act", "")
         seg_path = os.path.join(segments_dir, f"shot_{shot_id:03d}.mp4")
 
         if os.path.exists(seg_path) and not force_rerun:
-            print(f"⏭️ [镜头 {idx}/{len(shots)}] 已存在于云盘，跳过渲染: {seg_path}")
+            print(f"⏭️ [镜头 {idx}/{len(shots)}] ({act_name}) 已存在于云盘，跳过渲染: {seg_path}")
             segment_files.append(seg_path)
             continue
 
         anchor_rel = shot.get("anchor_image", f"keyframes/shot_{shot_id:03d}.jpg")
         anchor_pil = load_anchor_pil(anchor_rel, width, height)
-        full_prompt = f"{shot['prompt']}, {global_style}" if global_style else shot["prompt"]
+        if anchor_pil is None:
+            raise FileNotFoundError(f"未找到高清锚点原图: {anchor_rel}")
 
-        print(f"🖼️ [镜头 {idx}/{len(shots)}] Wan2.1-14B-720P 正在由超清原图生成视频 ({anchor_rel})...")
+        full_prompt = f"{shot['prompt']}, {global_style}" if global_style else shot["prompt"]
+        generator = torch.Generator("cpu").manual_seed(2026 + shot_id)
+
+        print(f"🖼️ [镜头 {idx}/{len(shots)}] ({act_name}) Wan2.1-14B-720P 正在由超清原图生成视频 ({anchor_rel})...")
         t0 = time.time()
         video_frames = pipe(
             image=anchor_pil,
@@ -422,11 +452,13 @@ def run_wan_i2v_pipeline(storyboard: dict, workspace_dir: str, force_rerun: bool
             height=height,
             width=width,
             num_frames=num_frames,
+            num_inference_steps=steps,
             guidance_scale=5.0,
+            generator=generator,
         ).frames[0]
 
         export_to_video(video_frames, seg_path, fps=fps)
-        print(f"✅ [镜头 {idx}/{len(shots)}] 完成 ({time.time() - t0:.1f}s) -> {seg_path}")
+        print(f"✅ [镜头 {idx}/{len(shots)}] 720P 渲染完成 ({time.time() - t0:.1f}s) -> 已实时存盘: {seg_path}")
         segment_files.append(seg_path)
 
         gc.collect()
@@ -446,7 +478,7 @@ def run_wan_i2v_pipeline(storyboard: dict, workspace_dir: str, force_rerun: bool
 def main():
     parser = argparse.ArgumentParser(description="90秒深海探索纪录片 720P 高清图生视频 (I2V) 流水线")
     parser.add_argument("--storyboard", type=str, default="storyboard.json", help="分镜剧本 JSON 路径")
-    parser.add_argument("--engine", type=str, choices=["ltx", "wan-i2v"], default=None, help="模型引擎: ltx (快速720P I2V) 或 wan-i2v (14B旗舰720P I2V)")
+    parser.add_argument("--engine", type=str, choices=["ltx", "wan-i2v"], default=None, help="模型引擎: wan-i2v (14B旗舰720P I2V) 或 ltx (快速720P I2V)")
     parser.add_argument("--max-shots", type=int, default=0, help="限制渲染前 N 个镜头 (0=全部 18 个镜头共 90 秒)")
     parser.add_argument("--bgm-only", type=str, default="", help="仅生成指定路径的 90 秒深海纯配乐 WAV 并退出")
     parser.add_argument("--force", action="store_true", help="强制重新渲染所有分镜（忽略断点缓存）")
@@ -467,7 +499,7 @@ def main():
     workspace_dir = os.getcwd()
     setup_local_ssd_cache()
 
-    engine = args.engine or storyboard.get("engine", "ltx")
+    engine = args.engine or storyboard.get("engine", "wan-i2v")
     if engine == "wan-i2v":
         final_video = run_wan_i2v_pipeline(storyboard, workspace_dir, force_rerun=args.force)
     else:
