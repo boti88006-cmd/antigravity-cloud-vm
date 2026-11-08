@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
 Antigravity Cloud VM × Google Colab GPU × 20TB Google Drive
-90秒+ 深海探索纪录片长视频生成流水线 (Long Video & Ambient Soundtrack Pipeline)
+90秒+ 深海探索纪录片 AI 视频大模型生成流水线 (True Diffusion Video Generation Pipeline)
 
 核心特性:
-1. 20TB Google Drive 永久模型缓存: 将 HF_HOME 指向云盘，几十 GB 模型权重只下载一次。
-2. 尾帧接力续写 (Last-Frame Chaining): 自动提取上一镜头的最后一帧作为下一镜头的首帧参考 (I2V)，实现长镜头连贯运镜。
-3. 断点续传 (Checkpoint Resume): 每个 5 秒分镜生成后立即落盘至 Google Drive，意外中断重跑自动跳过已完成分镜。
-4. 纯享纪录片级深海环境交响配乐 (无配音): 自动合成匹配视频总时长的三幕式立体声深海环境交响配乐 (WAV)，并与画面无损混流为最终 MP4。
+1. 真正的扩散视频大模型生成: 在 Colab GPU (G4 / T4 / L4 / A100) 上运行 Lightricks/LTX-Video 或 Wan2.1-T2V-1.3B。
+2. 20TB Google Drive 永久模型缓存: 将 HF_HOME 指向云盘，几十 GB 模型权重只下载一次。
+3. 尾帧接力续写 (Last-Frame I2V Chaining): 自动提取上一镜头的最后一帧作为下一镜头的首帧参考，生成连贯的长镜头视频。
+4. 断点续传 (Checkpoint Resume): 每个 5 秒分镜生成后立即落盘至 Google Drive，意外中断重跑自动跳过已完成分镜。
+5. 纯享纪录片级深海环境交响配乐 (无配音): 自动合成匹配视频总时长的三幕式立体声深海环境交响配乐 (WAV)，并与画面无损混流为最终 MP4。
 """
 import argparse
 import gc
@@ -30,10 +31,6 @@ def setup_drive_cache(workspace_dir: str):
 def generate_deep_sea_soundtrack(duration_sec: float, output_wav_path: str, sample_rate: int = 44100):
     """
     合成 BBC Blue Planet / Hans Zimmer 风格的深海探索纪录片纯配乐 (无配音)
-    包含三幕情绪递进:
-      - 第一幕 (阳光透射带): 清澈空灵的水晶泛音琶音 + 温暖大调合成器弦乐垫底
-      - 第二幕 (暮光与午夜带): 幽邃神秘的深海次声波共鸣 + 远古空灵鲸鸣滑音 + 微弱水下声呐脉冲
-      - 第三幕 (万米海沟奇迹): 恢弘史诗交响和弦渐强 + 深海静谧尾奏淡出
     """
     import numpy as np
 
@@ -44,14 +41,12 @@ def generate_deep_sea_soundtrack(duration_sec: float, output_wav_path: str, samp
     left = np.zeros(num_samples, dtype=np.float32)
     right = np.zeros(num_samples, dtype=np.float32)
 
-    # 1. 深海环境暖垫和弦进行 (C minor 9 -> Ab major 7 -> Fm9 -> G7sus4 -> Cmaj9 终章升华)
     chords = [
-        # (start_ratio, end_ratio, frequencies_hz)
-        (0.00, 0.22, [130.81, 196.00, 246.94, 293.66, 392.00]),   # Act I: Cmaj9 明亮透射阳光
-        (0.22, 0.45, [110.00, 164.81, 220.00, 261.63, 329.63]),   # Act II-a: Am7 初入幽暗暮光带
-        (0.45, 0.68, [87.31,  130.81, 174.61, 207.65, 261.63]),   # Act II-b: Fm9 午夜带巨型生物与神秘深渊
-        (0.68, 0.85, [103.83, 155.56, 207.65, 261.63, 311.13]),   # Act III-a: AbMaj7 海沟荧光花园奇观
-        (0.85, 1.00, [130.81, 196.00, 261.63, 329.63, 392.00]),   # Act III-b: C Major 史诗升华与宁静尾声
+        (0.00, 0.22, [130.81, 196.00, 246.94, 293.66, 392.00]),   # Act I: Cmaj9 阳光透射带
+        (0.22, 0.45, [110.00, 164.81, 220.00, 261.63, 329.63]),   # Act II-a: Am7 暮光带发光水母
+        (0.45, 0.68, [87.31,  130.81, 174.61, 207.65, 261.63]),   # Act II-b: Fm9 午夜带深海巨兽
+        (0.68, 0.85, [103.83, 155.56, 207.65, 261.63, 311.13]),   # Act III-a: AbMaj7 万米海沟秘境
+        (0.85, 1.00, [130.81, 196.00, 261.63, 329.63, 392.00]),   # Act III-b: C Major 史诗终章
     ]
 
     for start_r, end_r, freqs in chords:
@@ -61,9 +56,7 @@ def generate_deep_sea_soundtrack(duration_sec: float, output_wav_path: str, samp
         if seg_len <= 0:
             continue
         seg_t = t[s_idx:e_idx] - t[s_idx]
-        seg_dur = seg_len / sample_rate
 
-        # 柔和的交叉淡入淡出包络
         fade_len = min(int(3.5 * sample_rate), seg_len // 3)
         env = np.ones(seg_len, dtype=np.float32)
         if fade_len > 0:
@@ -71,7 +64,6 @@ def generate_deep_sea_soundtrack(duration_sec: float, output_wav_path: str, samp
             env[-fade_len:] = np.linspace(1.0, 0.0, fade_len, dtype=np.float32) ** 1.5
 
         for i, f in enumerate(freqs):
-            # 轻微失谐 (Detune) 与慢速 LFO 调制营造宽广的深海立体声包裹感
             lfo_l = 0.5 + 0.5 * np.sin(2.0 * np.pi * (0.12 + 0.03 * i) * seg_t + i)
             lfo_r = 0.5 + 0.5 * np.cos(2.0 * np.pi * (0.11 + 0.03 * i) * seg_t + i * 0.7)
 
@@ -89,13 +81,11 @@ def generate_deep_sea_soundtrack(duration_sec: float, output_wav_path: str, samp
             left[s_idx:e_idx] += amp * env * lfo_l * wave_l
             right[s_idx:e_idx] += amp * env * lfo_r * wave_r
 
-    # 2. 深海次声波低频脉动 (Sub-bass Drone, 55Hz ~ 65.4Hz)
     sub_env = 0.5 + 0.5 * np.sin(2.0 * np.pi * 0.08 * t)
     sub_wave = 0.18 * sub_env * np.sin(2.0 * np.pi * 65.41 * t)
     left += sub_wave
     right += sub_wave
 
-    # 3. 水下生物荧光水晶泛音点缀 (Bioluminescent Harp / Pluck Shimmers)
     pentatonic_notes = [523.25, 587.33, 659.25, 783.99, 987.77, 1046.50, 1318.51]
     rng = np.random.default_rng(seed=2026)
     note_times = np.arange(1.5, duration_sec - 2.5, 2.25)
@@ -108,7 +98,6 @@ def generate_deep_sea_soundtrack(duration_sec: float, output_wav_path: str, samp
             continue
         nt_arr = np.arange(actual_len, dtype=np.float32) / sample_rate
         freq = pentatonic_notes[idx % len(pentatonic_notes)]
-        # 快速起音 + 长水下混响衰减
         pluck_env = (1.0 - np.exp(-nt_arr * 25.0)) * np.exp(-nt_arr * 1.35)
         shimmer = 0.06 * pluck_env * (
             np.sin(2.0 * np.pi * freq * nt_arr)
@@ -118,7 +107,6 @@ def generate_deep_sea_soundtrack(duration_sec: float, output_wav_path: str, samp
         left[n_start:n_end] += shimmer * pan
         right[n_start:n_end] += shimmer * (1.0 - pan)
 
-    # 4. 远古空灵鲸歌共鸣 (Ethereal Whale Call Glissando, 在第 25s, 48s, 72s 出现)
     for call_start in [22.0, 46.0, 68.0]:
         if call_start + 6.0 >= duration_sec:
             continue
@@ -126,7 +114,6 @@ def generate_deep_sea_soundtrack(duration_sec: float, output_wav_path: str, samp
         c_len = int(5.5 * sample_rate)
         c_e = min(num_samples, c_s + c_len)
         ct = np.arange(c_e - c_s, dtype=np.float32) / sample_rate
-        # 频率从 380Hz 缓慢滑向 240Hz 再回升
         f_inst = 310.0 + 75.0 * np.cos(2.0 * np.pi * 0.18 * ct)
         phase = 2.0 * np.pi * np.cumsum(f_inst) / sample_rate
         c_env = np.sin(np.pi * ct / (ct[-1] + 1e-5)) ** 2
@@ -134,7 +121,6 @@ def generate_deep_sea_soundtrack(duration_sec: float, output_wav_path: str, samp
         left[c_s:c_e] += whale * 0.6
         right[c_s:c_e] += whale * 0.8
 
-    # 5. 全局首尾渐入渐出 (3秒渐入，4秒渐出) 与防削波归一化
     in_samples = min(int(3.0 * sample_rate), num_samples // 4)
     out_samples = min(int(4.0 * sample_rate), num_samples // 4)
     global_env = np.ones(num_samples, dtype=np.float32)
@@ -224,23 +210,27 @@ def concat_videos_with_bgm_ffmpeg(
 
 def run_ltx_pipeline(storyboard: dict, workspace_dir: str, force_rerun: bool = False):
     """
-    使用 Lightricks/LTX-Video (支持 T2V + I2V 尾帧接力) 渲染 90 秒深海探索纪录片
-    针对 G4 / T4 / L4 GPU 开启显存卸载与 VAE 分块解码
+    在 Colab GPU 上使用 Lightricks/LTX-Video 扩散视频大模型 (T2V + I2V 尾帧接力) 渲染 90 秒深海纪录片
     """
     import torch
-    from diffusers import LTXConditionPipeline
+    from diffusers import LTXConditionPipeline, LTXPipeline
     from diffusers.pipelines.ltx.pipeline_ltx_condition import LTXVideoCondition
     from diffusers.utils import export_to_video
 
     model_id = "Lightricks/LTX-Video"
-    print(f"🚀 正在加载视频大模型: {model_id} (缓存于 20TB Google Drive)...")
+    print(f"🚀 正在加载视频生成大模型: {model_id} (权重自动缓存至 20TB Google Drive)...")
 
-    pipe = LTXConditionPipeline.from_pretrained(
+    cond_pipe = LTXConditionPipeline.from_pretrained(
         model_id,
         torch_dtype=torch.bfloat16,
     )
-    pipe.enable_model_cpu_offload()
-    pipe.vae.enable_tiling()
+    # 零额外内存复用同一套权重组件构建纯文生视频 Pipeline
+    t2v_pipe = LTXPipeline.from_pipe(cond_pipe)
+
+    cond_pipe.enable_model_cpu_offload()
+    cond_pipe.vae.enable_tiling()
+    t2v_pipe.enable_model_cpu_offload()
+    t2v_pipe.vae.enable_tiling()
 
     width = storyboard.get("resolution", {}).get("width", 768)
     height = storyboard.get("resolution", {}).get("height", 512)
@@ -262,7 +252,7 @@ def run_ltx_pipeline(storyboard: dict, workspace_dir: str, force_rerun: bool = F
     prev_video_path = None
 
     print(
-        f"🌊 开始渲染深海探索纪录片《{title}》: 共 {len(shots)} 个镜头, "
+        f"🌊 开始使用 Colab GPU 渲染深海探索纪录片《{title}》: 共 {len(shots)} 个镜头, "
         f"单镜头 {seg_sec}s ({num_frames} 帧), 总时长 {total_duration} 秒 (纯配乐无配音)"
     )
 
@@ -285,10 +275,10 @@ def run_ltx_pipeline(storyboard: dict, workspace_dir: str, force_rerun: bool = F
         generator = torch.Generator("cpu").manual_seed(100 + shot_id)
 
         if chain_prev:
-            print(f"🔗 [镜头 {idx}/{len(shots)}] ({act_name}) 尾帧接力模式 (I2V): 承接上一镜头连续下潜...")
+            print(f"🔗 [镜头 {idx}/{len(shots)}] ({act_name}) 尾帧接力模式 (I2V): 提取上一镜头尾帧继续生成动态视频...")
             cond_img = extract_last_frame(prev_video_path, last_frame_path)
             condition = LTXVideoCondition(image=cond_img, frame_index=0)
-            video_frames = pipe(
+            video_frames = cond_pipe(
                 conditions=[condition],
                 prompt=full_prompt,
                 negative_prompt=negative_prompt,
@@ -300,9 +290,8 @@ def run_ltx_pipeline(storyboard: dict, workspace_dir: str, force_rerun: bool = F
                 generator=generator,
             ).frames[0]
         else:
-            print(f"🎬 [镜头 {idx}/{len(shots)}] ({act_name}) 独立新场景模式 (T2V): 渲染深海新分镜...")
-            video_frames = pipe(
-                conditions=None,
+            print(f"🎬 [镜头 {idx}/{len(shots)}] ({act_name}) 文生视频模式 (T2V): 渲染深海新场景动态视频...")
+            video_frames = t2v_pipe(
                 prompt=full_prompt,
                 negative_prompt=negative_prompt,
                 width=width,
@@ -315,7 +304,7 @@ def run_ltx_pipeline(storyboard: dict, workspace_dir: str, force_rerun: bool = F
 
         export_to_video(video_frames, seg_path, fps=fps)
         elapsed = time.time() - t0
-        print(f"✅ [镜头 {idx}/{len(shots)}] 渲染完成 ({elapsed:.1f}s) -> 已实时存盘至 Google Drive: {seg_path}")
+        print(f"✅ [镜头 {idx}/{len(shots)}] GPU 渲染完成 ({elapsed:.1f}s) -> 已实时存盘至 Google Drive: {seg_path}")
 
         segment_files.append(seg_path)
         prev_video_path = seg_path
@@ -336,7 +325,7 @@ def run_ltx_pipeline(storyboard: dict, workspace_dir: str, force_rerun: bool = F
 
 def run_wan_pipeline(storyboard: dict, workspace_dir: str, force_rerun: bool = False):
     """
-    使用阿里通义万相 Wan-AI/Wan2.1-T2V-1.3B-Diffusers 渲染高画质多分镜深海纪录片
+    在 Colab GPU 上使用阿里通义万相 Wan-AI/Wan2.1-T2V-1.3B-Diffusers 渲染高画质多分镜深海纪录片
     """
     import torch
     from diffusers import AutoencoderKLWan, WanPipeline
@@ -436,7 +425,7 @@ def main():
         final_video = run_ltx_pipeline(storyboard, workspace_dir, force_rerun=args.force)
 
     print("========================================================")
-    print("🎉 90秒深海探索纪录片（纯配乐版）全部生成完成！")
+    print("🎉 90秒深海探索纪录片（Colab GPU 真视频大模型生成 + 纯配乐版）全部生成完成！")
     print(f"📁 完整成片路径 (Google Drive): {final_video}")
     print("👉 在 Antigravity VM 中执行 `bash ./colab-sync.sh pull` 即可拉取到本地。")
     print("========================================================")
