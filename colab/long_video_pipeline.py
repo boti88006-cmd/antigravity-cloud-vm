@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 """
 Antigravity Cloud VM × Google Colab GPU (RTX PRO 6000 Blackwell 96GB) × 20TB Google Drive
-90秒+ 深海探索纪录片 AI 视频大模型生成流水线 (True Diffusion Video Generation Pipeline)
+90秒+ 深海探索纪录片 720P 高清图生视频流水线 (720P HD Anchor Image-to-Video Pipeline)
 
-修复与优化说明:
-1. 本地 NVMe 高速缓存 (/content/hf_cache): 模型 28.4GB 已缓存，1秒极速加载。
-2. 95GB 显存满血直通 (pipe.to("cuda")): 单镜头 5 秒视频仅需 ~35 秒。
-3. 使用 LTXPipeline (T2V) + LTXImageToVideoPipeline (I2V 尾帧接力):
-   完美匹配 Lightricks/LTX-Video 的 FlowMatchEulerDiscreteScheduler (自动计算动态偏移 mu 参数)，
-   彻底解决 LTXConditionPipeline 报 `mu must be passed when use_dynamic_shifting is set to True` 的问题。
-4. 断点续传: 自动跳过已完成的 shot_001.mp4，直接从 shot_002 开始继续渲染！
+为什么比纯文生视频清晰度高出数倍:
+1. 18张 8K/720P IMAX 超清母版图锚点驱动 (Pure Anchor I2V):
+   每个 5 秒分镜都直接以一张极致锐利的 IMAX 深海高清原图 (keyframes/shot_001.jpg ~ shot_018.jpg) 作为起始帧，
+   彻底消除“纯文生视频 + 连续提取模糊尾帧接力”造成的代际画质崩坏与糊化！
+2. 分辨率全面升级至 1280x704 (720P 16:9 HD) + 50 步精细去噪:
+   利用 NVIDIA RTX PRO 6000 Blackwell (95GB VRAM) 满血显存，将像素量提升 2.3 倍。
+3. 双高清图生视频大模型引擎支持:
+   - `--engine ltx` (默认): LTXImageToVideoPipeline @ 1280x704 50步 (直接复用已缓存的 28.4GB 权重，免重下模型)
+   - `--engine wan-i2v`: 阿里通义万相旗舰 Wan-AI/Wan2.1-I2V-14B-720P-Diffusers (140亿参数 720P 殿堂级图生视频)
+4. FFmpeg 超清锐化与 CRF 14 无损级高码率封装 + 90 秒立体声深海环境交响纯配乐。
 """
 import argparse
 import gc
@@ -22,9 +25,7 @@ import wave
 
 
 def setup_local_ssd_cache():
-    """
-    将 HuggingFace 模型缓存绑定到 Colab 本地高速 NVMe SSD (/content/hf_cache)
-    """
+    """将 HuggingFace 模型缓存绑定到 Colab 本地高速 NVMe SSD (/content/hf_cache)"""
     local_cache = "/content/hf_cache" if os.path.exists("/content") else os.path.abspath("./hf_cache_local")
     os.makedirs(local_cache, exist_ok=True)
     os.environ["HF_HOME"] = local_cache
@@ -34,9 +35,7 @@ def setup_local_ssd_cache():
 
 
 def generate_deep_sea_soundtrack(duration_sec: float, output_wav_path: str, sample_rate: int = 44100):
-    """
-    合成 BBC Blue Planet / Hans Zimmer 风格的深海探索纪录片纯配乐 (无配音)
-    """
+    """合成 BBC Blue Planet / Hans Zimmer 风格的深海探索纪录片纯配乐 (无配音)"""
     import numpy as np
 
     print(f"🎵 正在合成 {duration_sec:.1f} 秒深海探索纪录片立体声纯配乐 (无配音): {output_wav_path}")
@@ -154,40 +153,15 @@ def generate_deep_sea_soundtrack(duration_sec: float, output_wav_path: str, samp
     return output_wav_path
 
 
-def extract_last_frame_from_mp4(video_path: str, output_image_path: str):
-    """从磁盘已有的 MP4 分镜中提取最后一帧 PIL Image（用于断点续传恢复）"""
-    import av
+def load_anchor_pil(anchor_rel_path: str, width: int, height: int):
+    """加载超清锚点关键帧图像并调整为目标 HD 尺寸"""
     from PIL import Image
 
-    container = av.open(video_path)
-    last_frame = None
-    for frame in container.decode(video=0):
-        last_frame = frame
-    container.close()
-    if last_frame is None:
-        raise RuntimeError(f"无法从视频解码帧: {video_path}")
-    img = last_frame.to_image().convert("RGB")
-    img.save(output_image_path)
-    return img
-
-
-def ensure_pil_image(frame_obj, output_image_path: str | None = None):
-    """将模型输出的帧对象 (PIL.Image 或 numpy array) 统一转为 PIL.Image"""
-    import numpy as np
-    from PIL import Image
-
-    if isinstance(frame_obj, Image.Image):
-        img = frame_obj.convert("RGB")
-    else:
-        arr = np.asarray(frame_obj)
-        if arr.dtype != np.uint8:
-            if arr.max() <= 1.0:
-                arr = (arr * 255.0).clip(0, 255).astype(np.uint8)
-            else:
-                arr = arr.clip(0, 255).astype(np.uint8)
-        img = Image.fromarray(arr).convert("RGB")
-    if output_image_path:
-        img.save(output_image_path)
+    if not anchor_rel_path or not os.path.exists(anchor_rel_path):
+        return None
+    img = Image.open(anchor_rel_path).convert("RGB")
+    if img.size != (width, height):
+        img = img.resize((width, height), Image.Resampling.LANCZOS)
     return img
 
 
@@ -196,12 +170,14 @@ def concat_videos_with_bgm_ffmpeg(
     final_output_path: str,
     bgm_wav_path: str | None = None,
 ):
-    """使用 FFmpeg 将多个 5 秒分镜无损拼接，并混入深海纪录片立体声纯配乐"""
+    """使用 FFmpeg 将多个 5 秒高清分镜拼接，开启细节锐化滤镜 (unsharp) 与 CRF 14 高清码率，并混入立体声配乐"""
     list_file = os.path.join(os.path.dirname(final_output_path), "concat_list.txt")
     with open(list_file, "w", encoding="utf-8") as f:
         for seg in segment_paths:
             abs_seg = os.path.abspath(seg)
             f.write(f"file '{abs_seg}'\n")
+
+    vf_filter = "unsharp=5:5:0.55:3:3:0.0"
 
     if bgm_wav_path and os.path.exists(bgm_wav_path):
         cmd = [
@@ -212,10 +188,11 @@ def concat_videos_with_bgm_ffmpeg(
             "-i", bgm_wav_path,
             "-map", "0:v:0",
             "-map", "1:a:0",
+            "-vf", vf_filter,
             "-c:v", "libx264",
             "-pix_fmt", "yuv420p",
-            "-crf", "18",
-            "-preset", "fast",
+            "-crf", "14",
+            "-preset", "slow",
             "-c:a", "aac",
             "-b:a", "192k",
             "-shortest",
@@ -227,22 +204,20 @@ def concat_videos_with_bgm_ffmpeg(
             "-f", "concat",
             "-safe", "0",
             "-i", list_file,
+            "-vf", vf_filter,
             "-c:v", "libx264",
             "-pix_fmt", "yuv420p",
-            "-crf", "18",
-            "-preset", "fast",
+            "-crf", "14",
+            "-preset", "slow",
             final_output_path,
         ]
 
     subprocess.run(cmd, check=True)
-    print(f"🎬 完整深海纪录片长视频（含立体声纯配乐）已合成: {final_output_path}")
+    print(f"🎬 720P 高清深海纪录片长视频（含立体声纯配乐）已合成: {final_output_path}")
 
 
 def load_ltx_pipelines(model_id: str):
-    """
-    加载 LTXPipeline (文生视频 T2V) 与 LTXImageToVideoPipeline (图生视频 I2V 尾帧接力)
-    二者均原生支持 FlowMatchEulerDiscreteScheduler 的动态 mu 偏移计算！
-    """
+    """加载 LTXImageToVideoPipeline 与 LTXPipeline"""
     import torch
     from diffusers import LTXImageToVideoPipeline, LTXPipeline
 
@@ -280,7 +255,9 @@ def load_ltx_pipelines(model_id: str):
 
 def run_ltx_pipeline(storyboard: dict, workspace_dir: str, force_rerun: bool = False):
     """
-    在 Colab GPU 上使用 Lightricks/LTX-Video 扩散视频大模型 (T2V + I2V 尾帧接力) 渲染 90 秒深海纪录片
+    720P (1280x704) 超清锚点图生视频模式 (Anchor Keyframe I2V):
+    每个镜头都直接由一张 1280x704 的 IMAX 超清原图驱动 LTXImageToVideoPipeline 生成动态视频，
+    彻底消除纯文生视频与多代尾帧传递导致的画面模糊！
     """
     import torch
     from diffusers.utils import export_to_video
@@ -290,16 +267,17 @@ def run_ltx_pipeline(storyboard: dict, workspace_dir: str, force_rerun: bool = F
 
     t2v_pipe, i2v_pipe = load_ltx_pipelines(model_id)
 
-    width = storyboard.get("resolution", {}).get("width", 768)
-    height = storyboard.get("resolution", {}).get("height", 512)
+    width = storyboard.get("resolution", {}).get("width", 1280)
+    height = storyboard.get("resolution", {}).get("height", 704)
     fps = storyboard.get("fps", 24)
     seg_sec = storyboard.get("segment_seconds", 5)
+    steps = storyboard.get("num_inference_steps", 50)
     raw_frames = fps * seg_sec
     num_frames = ((raw_frames - 1) // 8) * 8 + 1
 
     global_style = storyboard.get("global_style", "")
-    negative_prompt = storyboard.get("negative_prompt", "low quality, worst quality, deformed, distorted")
-    title = storyboard.get("title", "Deep_Sea_Odyssey_90s")
+    negative_prompt = storyboard.get("negative_prompt", "blurry, out of focus, low quality, worst quality")
+    title = storyboard.get("title", "Deep_Sea_Odyssey_90s_HD_I2V")
 
     segments_dir = os.path.join(workspace_dir, "outputs", title, "segments")
     os.makedirs(segments_dir, exist_ok=True)
@@ -307,64 +285,58 @@ def run_ltx_pipeline(storyboard: dict, workspace_dir: str, force_rerun: bool = F
     shots = storyboard.get("shots", [])
     total_duration = len(shots) * seg_sec
     segment_files = []
-    prev_last_pil = None
 
     print(
-        f"🌊 开始使用 Colab GPU 渲染深海探索纪录片《{title}》: 共 {len(shots)} 个镜头, "
-        f"单镜头 {seg_sec}s ({num_frames} 帧), 总时长 {total_duration} 秒 (纯配乐无配音)"
+        f"🌊 开始使用 Colab GPU 渲染 720P 高清图生视频纪录片《{title}》:\n"
+        f"   分辨率: {width}x{height} (720P HD) | 步数: {steps} | 共 {len(shots)} 个镜头 ({total_duration}s)"
     )
 
     for idx, shot in enumerate(shots, start=1):
         shot_id = shot.get("id", idx)
         act_name = shot.get("act", "")
         seg_path = os.path.join(segments_dir, f"shot_{shot_id:03d}.mp4")
-        last_frame_path = os.path.join(segments_dir, f"shot_{shot_id:03d}_last.png")
 
         if os.path.exists(seg_path) and not force_rerun:
             print(f"⏭️ [镜头 {idx}/{len(shots)}] ({act_name}) 已存在于云盘，跳过渲染: {seg_path}")
             segment_files.append(seg_path)
-            try:
-                prev_last_pil = extract_last_frame_from_mp4(seg_path, last_frame_path)
-            except Exception:
-                prev_last_pil = None
             continue
 
         full_prompt = f"{shot['prompt']}, {global_style}" if global_style else shot["prompt"]
-        chain_prev = shot.get("chain_from_previous", False) and (prev_last_pil is not None)
+        anchor_rel = shot.get("anchor_image", f"keyframes/shot_{shot_id:03d}.jpg")
+        anchor_pil = load_anchor_pil(anchor_rel, width, height)
 
         t0 = time.time()
-        generator = torch.Generator("cpu").manual_seed(100 + shot_id)
+        generator = torch.Generator("cpu").manual_seed(2026 + shot_id)
 
-        if chain_prev:
-            print(f"🔗 [镜头 {idx}/{len(shots)}] ({act_name}) 尾帧接力模式 (I2V): 承接上一镜头尾帧继续生成动态视频...")
+        if anchor_pil is not None:
+            print(f"🖼️ [镜头 {idx}/{len(shots)}] ({act_name}) 720P 超清原图驱动 (Anchor I2V: {anchor_rel})...")
             video_frames = i2v_pipe(
-                image=prev_last_pil,
+                image=anchor_pil,
                 prompt=full_prompt,
                 negative_prompt=negative_prompt,
                 width=width,
                 height=height,
                 num_frames=num_frames,
-                num_inference_steps=35,
-                guidance_scale=3.0,
+                num_inference_steps=steps,
+                guidance_scale=3.5,
                 generator=generator,
             ).frames[0]
         else:
-            print(f"🎬 [镜头 {idx}/{len(shots)}] ({act_name}) 文生视频模式 (T2V): 渲染深海新场景动态视频...")
+            print(f"🎬 [镜头 {idx}/{len(shots)}] ({act_name}) 文生视频模式 (T2V)...")
             video_frames = t2v_pipe(
                 prompt=full_prompt,
                 negative_prompt=negative_prompt,
                 width=width,
                 height=height,
                 num_frames=num_frames,
-                num_inference_steps=35,
-                guidance_scale=3.0,
+                num_inference_steps=steps,
+                guidance_scale=3.5,
                 generator=generator,
             ).frames[0]
 
         export_to_video(video_frames, seg_path, fps=fps)
-        prev_last_pil = ensure_pil_image(video_frames[-1], last_frame_path)
         elapsed = time.time() - t0
-        print(f"✅ [镜头 {idx}/{len(shots)}] GPU 渲染完成 ({elapsed:.1f}s) -> 已实时存盘至 Google Drive: {seg_path}")
+        print(f"✅ [镜头 {idx}/{len(shots)}] 720P HD 渲染完成 ({elapsed:.1f}s) -> 已存盘: {seg_path}")
 
         segment_files.append(seg_path)
 
@@ -382,35 +354,44 @@ def run_ltx_pipeline(storyboard: dict, workspace_dir: str, force_rerun: bool = F
     return final_output
 
 
-def run_wan_pipeline(storyboard: dict, workspace_dir: str, force_rerun: bool = False):
+def run_wan_i2v_pipeline(storyboard: dict, workspace_dir: str, force_rerun: bool = False):
     """
-    在 Colab GPU 上使用阿里通义万相 Wan-AI/Wan2.1-T2V-1.3B-Diffusers 渲染高画质多分镜深海纪录片
+    使用阿里通义万相 Wan-AI/Wan2.1-I2V-14B-720P-Diffusers (140亿参数 720P 旗舰图生视频大模型)
+    专为 95GB RTX PRO 6000 Blackwell 打造！
     """
     import torch
-    from diffusers import AutoencoderKLWan, WanPipeline
+    from diffusers import AutoencoderKLWan, WanImageToVideoPipeline
     from diffusers.utils import export_to_video
+    from transformers import CLIPVisionModel
 
-    model_id = "Wan-AI/Wan2.1-T2V-1.3B-Diffusers"
-    print(f"🚀 正在加载通义万相视频模型: {model_id}...")
+    model_id = "Wan-AI/Wan2.1-I2V-14B-720P-Diffusers"
+    print(f"🚀 正在加载通义万相 14B 720P 旗舰图生视频模型: {model_id}...")
 
+    image_encoder = CLIPVisionModel.from_pretrained(model_id, subfolder="image_encoder", torch_dtype=torch.float32)
     vae = AutoencoderKLWan.from_pretrained(model_id, subfolder="vae", torch_dtype=torch.float32)
-    pipe = WanPipeline.from_pretrained(model_id, vae=vae, torch_dtype=torch.bfloat16)
+    pipe = WanImageToVideoPipeline.from_pretrained(
+        model_id,
+        vae=vae,
+        image_encoder=image_encoder,
+        torch_dtype=torch.bfloat16,
+    )
 
     vram_gb = torch.cuda.get_device_properties(0).total_memory / (1024 ** 3) if torch.cuda.is_available() else 0
-    if vram_gb >= 28.0:
+    if vram_gb >= 45.0:
+        print("⚡ 95GB Blackwell 显存充裕，启用 Wan2.1-14B 全量 CUDA 直通加速！")
         pipe.to("cuda")
     else:
         pipe.enable_model_cpu_offload()
 
-    width = storyboard.get("resolution", {}).get("width", 832)
-    height = storyboard.get("resolution", {}).get("height", 480)
-    fps = storyboard.get("fps", 16)
+    width = 1280
+    height = 720
+    fps = 16
     seg_sec = storyboard.get("segment_seconds", 5)
-    num_frames = 81
+    num_frames = 81  # 5s @ 16fps
 
     global_style = storyboard.get("global_style", "")
     negative_prompt = storyboard.get("negative_prompt", "")
-    title = storyboard.get("title", "Deep_Sea_Odyssey_90s_Wan")
+    title = "Deep_Sea_Odyssey_90s_Wan14B_720P"
 
     segments_dir = os.path.join(workspace_dir, "outputs", title, "segments")
     os.makedirs(segments_dir, exist_ok=True)
@@ -428,10 +409,14 @@ def run_wan_pipeline(storyboard: dict, workspace_dir: str, force_rerun: bool = F
             segment_files.append(seg_path)
             continue
 
+        anchor_rel = shot.get("anchor_image", f"keyframes/shot_{shot_id:03d}.jpg")
+        anchor_pil = load_anchor_pil(anchor_rel, width, height)
         full_prompt = f"{shot['prompt']}, {global_style}" if global_style else shot["prompt"]
-        print(f"🎬 [镜头 {idx}/{len(shots)}] Wan2.1 正在渲染...")
+
+        print(f"🖼️ [镜头 {idx}/{len(shots)}] Wan2.1-14B-720P 正在由超清原图生成视频 ({anchor_rel})...")
         t0 = time.time()
         video_frames = pipe(
+            image=anchor_pil,
             prompt=full_prompt,
             negative_prompt=negative_prompt,
             height=height,
@@ -459,9 +444,9 @@ def run_wan_pipeline(storyboard: dict, workspace_dir: str, force_rerun: bool = F
 
 
 def main():
-    parser = argparse.ArgumentParser(description="90秒深海探索纪录片 AI 长视频生成流水线")
+    parser = argparse.ArgumentParser(description="90秒深海探索纪录片 720P 高清图生视频 (I2V) 流水线")
     parser.add_argument("--storyboard", type=str, default="storyboard.json", help="分镜剧本 JSON 路径")
-    parser.add_argument("--engine", type=str, choices=["ltx", "wan"], default=None, help="覆盖模型引擎 (ltx 或 wan)")
+    parser.add_argument("--engine", type=str, choices=["ltx", "wan-i2v"], default=None, help="模型引擎: ltx (快速720P I2V) 或 wan-i2v (14B旗舰720P I2V)")
     parser.add_argument("--max-shots", type=int, default=0, help="限制渲染前 N 个镜头 (0=全部 18 个镜头共 90 秒)")
     parser.add_argument("--bgm-only", type=str, default="", help="仅生成指定路径的 90 秒深海纯配乐 WAV 并退出")
     parser.add_argument("--force", action="store_true", help="强制重新渲染所有分镜（忽略断点缓存）")
@@ -483,15 +468,14 @@ def main():
     setup_local_ssd_cache()
 
     engine = args.engine or storyboard.get("engine", "ltx")
-    if engine == "wan":
-        final_video = run_wan_pipeline(storyboard, workspace_dir, force_rerun=args.force)
+    if engine == "wan-i2v":
+        final_video = run_wan_i2v_pipeline(storyboard, workspace_dir, force_rerun=args.force)
     else:
         final_video = run_ltx_pipeline(storyboard, workspace_dir, force_rerun=args.force)
 
     print("========================================================")
-    print("🎉 90秒深海探索纪录片（Colab GPU 真视频大模型生成 + 纯配乐版）全部生成完成！")
+    print("🎉 90秒深海探索纪录片（720P 超清原图驱动 I2V + 纯配乐版）全部生成完成！")
     print(f"📁 完整成片路径 (Google Drive): {final_video}")
-    print("👉 在 Antigravity VM 中执行 `bash ./colab-sync.sh pull` 即可拉取到本地。")
     print("========================================================")
 
 
