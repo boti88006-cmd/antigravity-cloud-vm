@@ -1,5 +1,5 @@
 {
-  "title": "Cyberpunk_Odyssey_60s",
+  "title": "Deep_Sea_Odyssey_90s",
   "engine": "ltx",
   "resolution": {
     "width": 768,
@@ -7,80 +7,137 @@
   },
   "fps": 24,
   "segment_seconds": 5,
-  "global_style": "cinematic, photorealistic, 8k resolution, volumetric lighting, masterpiece, smooth camera motion, anamorphic lens",
-  "negative_prompt": "low quality, worst quality, deformed, distorted, disfigured, motion smear, motion artifacts, fused fingers, bad anatomy, weird hand, ugly, watermark, text",
+  "bgm_enabled": true,
+  "bgm_style": "deep_sea_ambient_symphony",
+  "voiceover_enabled": false,
+  "global_style": "BBC Blue Planet documentary style, National Geographic underwater cinematography, IMAX 8k photorealistic, volumetric underwater lighting, extreme detail, smooth stabilized camera motion, natural marine colors",
+  "negative_prompt": "low quality, worst quality, deformed, distorted, disfigured, motion smear, motion artifacts, text, subtitles, watermark, logo, cartoon, anime, CGI look, overexposed",
   "shots": [
     {
       "id": 1,
       "duration": 5,
       "chain_from_previous": false,
-      "prompt": "Aerial drone establishing shot flying through a futuristic cyberpunk metropolis at night, neon holograms reflecting on wet glass skyscrapers, flying vehicles streaking through rain"
+      "act": "Act I: Sunlight Zone (0m - 200m)",
+      "prompt": "Breathtaking underwater shot looking up at golden sunbeams piercing through crystal clear turquoise ocean surface, shimmering god rays dancing through a massive swirling bait ball of silver sardines and dolphins"
     },
     {
       "id": 2,
       "duration": 5,
       "chain_from_previous": true,
-      "prompt": "The camera dives smoothly downward from the skyscrapers into a bustling neon-lit street market, steam rising from street food stalls, pedestrians holding glowing umbrellas"
+      "act": "Act I: Sunlight Zone (0m - 200m)",
+      "prompt": "Smooth descending camera gliding over a vibrant coral reef canyon teeming with tropical fish, a giant oceanic manta ray gracefully banking and gliding across the sunbeams in slow motion"
     },
     {
       "id": 3,
       "duration": 5,
       "chain_from_previous": true,
-      "prompt": "Tracking shot following a lone cybernetic detective in a dark trench coat walking through the crowded rain-soaked alley, neon signs flickering in puddles"
+      "act": "Act I: Sunlight Zone (0m - 200m)",
+      "prompt": "Following the manta ray toward the edge of a steep continental shelf drop-off where bright turquoise water transitions into deep indigo abyss, a sleek scientific deep-sea submersible descending with warm golden spotlights"
     },
     {
       "id": 4,
       "duration": 5,
       "chain_from_previous": true,
-      "prompt": "The detective pauses in front of a massive holographic projection of a digital AI goddess floating in the center of the plaza, glowing cyan particles drifting in the air"
+      "act": "Act I: Sunlight Zone (0m - 200m)",
+      "prompt": "The submersible descends deeper through the thermocline layer, sunlight fading into dark sapphire blue above, tiny bioluminescent plankton beginning to sparkle like stars around the viewport"
     },
     {
       "id": 5,
       "duration": 5,
-      "chain_from_previous": true,
-      "prompt": "Close-up panning shot as the detective enters a high-tech underground laboratory, rows of quantum server racks pulsing with golden fiber-optic light"
+      "chain_from_previous": false,
+      "act": "Act II: Twilight & Midnight Zone (200m - 4000m)",
+      "prompt": "Entering the pitch-black mesopelagic twilight zone, hundreds of translucent bioluminescent crystal jellyfish pulsing with ethereal cyan, magenta, and violet neon light in the dark ocean"
     },
     {
       "id": 6,
       "duration": 5,
       "chain_from_previous": true,
-      "prompt": "Inside the lab, a translucent 3D star map of the galaxy unfolds in mid-air, rotating slowly with glowing trajectories and orbital rings"
+      "act": "Act II: Twilight & Midnight Zone (200m - 4000m)",
+      "prompt": "Extreme macro close-up tracking a delicate deep-sea comb jelly ctenophore drifting in the current, iridescent rainbow light waves rippling along its cilia rows against the dark blue void"
     },
     {
       "id": 7,
       "duration": 5,
-      "chain_from_previous": false,
-      "prompt": "Cut to an orbital space elevator rising above the Earth's atmosphere at dawn, sunlight gleaming off metallic cables, curvature of the Earth with glowing city grids below"
+      "chain_from_previous": true,
+      "act": "Act II: Twilight & Midnight Zone (200m - 4000m)",
+      "prompt": "Wide cinematic panning shot in the dark midnight zone as a colossal deep-sea giant squid with glowing sapphire eyes and flowing tentacles glides silently past the submersible's light beam"
     },
     {
       "id": 8,
       "duration": 5,
       "chain_from_previous": true,
-      "prompt": "The camera glides alongside a sleek silver spacecraft docking at the orbital ring station, thruster plumes illuminating the dark void of space"
+      "act": "Act II: Twilight & Midnight Zone (200m - 4000m)",
+      "prompt": "The submersible's powerful volumetric spotlight cuts through eternal darkness at 3000 meters depth, illuminating drifting marine snow particles like a cosmic nebula in deep space"
     },
     {
       "id": 9,
       "duration": 5,
       "chain_from_previous": true,
-      "prompt": "Interior view from the cockpit window as the spacecraft engages warp drive, stars stretching into vibrant streaks of blue and violet hyperspace light"
+      "act": "Act II: Twilight & Midnight Zone (200m - 4000m)",
+      "prompt": "Close-up of a mysterious deep-sea anglerfish hovering motionless in the dark current, its bioluminescent esca lure glowing with hypnotic blue-green light, intricate translucent fins"
     },
     {
       "id": 10,
       "duration": 5,
-      "chain_from_previous": false,
-      "prompt": "Emerging from hyperspace above an alien ocean world with twin moons and glowing bioluminescent rings in the sky, dramatic cosmic nebula background"
+      "chain_from_previous": true,
+      "act": "Act II: Twilight & Midnight Zone (200m - 4000m)",
+      "prompt": "Camera tilts downward revealing a dramatic volcanic rift valley on the ocean floor, faint molten orange glow emanating from fissures in the black basalt rock, clouds of mineral-rich water"
     },
     {
       "id": 11,
       "duration": 5,
-      "chain_from_previous": true,
-      "prompt": "Sweeping low-altitude flight over crystal-clear alien ocean waves, towering crystalline spires rising from the water under golden twilight clouds"
+      "chain_from_previous": false,
+      "act": "Act III: Abyssal & Hadal Trench (4000m - 11000m)",
+      "prompt": "Towering hydrothermal black smoker chimneys erupting superheated mineral clouds on the abyssal plain, surrounded by dense colonies of crimson-plumed giant tube worms and white vent shrimp"
     },
     {
       "id": 12,
       "duration": 5,
       "chain_from_previous": true,
-      "prompt": "Final slow pull-back shot revealing a futuristic glass citadel built atop the highest crystal spire, twin moons aligning on the horizon, epic cinematic ending"
+      "act": "Act III: Abyssal & Hadal Trench (4000m - 11000m)",
+      "prompt": "The camera glides past the hydrothermal vents and descends along a sheer vertical cliff face into the Mariana Hadal Trench at 10000 meters, ancient stratified rock walls illuminated by rover lights"
+    },
+    {
+      "id": 13,
+      "duration": 5,
+      "chain_from_previous": true,
+      "act": "Act III: Abyssal & Hadal Trench (4000m - 11000m)",
+      "prompt": "Reaching the tranquil seabed of the hadal trench, revealing an otherworldly garden of glowing bioluminescent glass sponges and delicate sea lilies swaying gently in the deep current"
+    },
+    {
+      "id": 14,
+      "duration": 5,
+      "chain_from_previous": true,
+      "act": "Act III: Abyssal & Hadal Trench (4000m - 11000m)",
+      "prompt": "Close tracking shot of a ghostly translucent hadal snailfish swimming gracefully inches above the fine abyssal sediment, its internal organs softly glowing under the documentary lighting"
+    },
+    {
+      "id": 15,
+      "duration": 5,
+      "chain_from_previous": true,
+      "act": "Act III: Abyssal & Hadal Trench (4000m - 11000m)",
+      "prompt": "Slow awe-inspiring push-in shot toward a colossal natural basalt stone arch on the trench floor covered in pulsing bioluminescent deep-sea corals emitting soft emerald and azure light"
+    },
+    {
+      "id": 16,
+      "duration": 5,
+      "chain_from_previous": true,
+      "act": "Act III: Abyssal & Hadal Trench (4000m - 11000m)",
+      "prompt": "Passing through the underwater stone arch as thousands of glowing deep-sea medusa jellyfish and siphonophores rise together in a spiraling bioluminescent vortex"
+    },
+    {
+      "id": 17,
+      "duration": 5,
+      "chain_from_previous": true,
+      "act": "Act III: Abyssal & Hadal Trench (4000m - 11000m)",
+      "prompt": "Majestic low-angle upward shot as the submersible ascends slowly through the swirling galaxy of bioluminescent marine life, golden spotlights blending with natural cyan ocean glow"
+    },
+    {
+      "id": 18,
+      "duration": 5,
+      "chain_from_previous": true,
+      "act": "Act III: Abyssal & Hadal Trench (4000m - 11000m)",
+      "prompt": "Final slow cinematic pull-back into the vast silent blue abyss, distant bioluminescent organisms twinkling like stars in the eternal ocean depths, peaceful documentary finale"
     }
   ]
 }

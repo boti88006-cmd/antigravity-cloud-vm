@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
 Antigravity Cloud VM × Google Colab GPU × 20TB Google Drive
-1分钟+ 长视频生成流水线 (Long Video Generation Pipeline)
+90秒+ 深海探索纪录片长视频生成流水线 (Long Video & Ambient Soundtrack Pipeline)
 
 核心特性:
 1. 20TB Google Drive 永久模型缓存: 将 HF_HOME 指向云盘，几十 GB 模型权重只下载一次。
 2. 尾帧接力续写 (Last-Frame Chaining): 自动提取上一镜头的最后一帧作为下一镜头的首帧参考 (I2V)，实现长镜头连贯运镜。
 3. 断点续传 (Checkpoint Resume): 每个 5 秒分镜生成后立即落盘至 Google Drive，意外中断重跑自动跳过已完成分镜。
-4. FFmpeg 自动合成长片: 所有分镜渲染完成后，自动无损拼接为 60 秒+ 完整 MP4 视频。
+4. 纯享纪录片级深海环境交响配乐 (无配音): 自动合成匹配视频总时长的三幕式立体声深海环境交响配乐 (WAV)，并与画面无损混流为最终 MP4。
 """
 import argparse
 import gc
@@ -15,7 +15,7 @@ import json
 import os
 import subprocess
 import time
-from pathlib import Path
+import wave
 
 
 def setup_drive_cache(workspace_dir: str):
@@ -25,6 +25,142 @@ def setup_drive_cache(workspace_dir: str):
     os.environ["HF_HOME"] = hf_cache
     os.environ["HUGGINGFACE_HUB_CACHE"] = os.path.join(hf_cache, "hub")
     print(f"📦 模型永久缓存目录已绑定至 Google Drive: {hf_cache}")
+
+
+def generate_deep_sea_soundtrack(duration_sec: float, output_wav_path: str, sample_rate: int = 44100):
+    """
+    合成 BBC Blue Planet / Hans Zimmer 风格的深海探索纪录片纯配乐 (无配音)
+    包含三幕情绪递进:
+      - 第一幕 (阳光透射带): 清澈空灵的水晶泛音琶音 + 温暖大调合成器弦乐垫底
+      - 第二幕 (暮光与午夜带): 幽邃神秘的深海次声波共鸣 + 远古空灵鲸鸣滑音 + 微弱水下声呐脉冲
+      - 第三幕 (万米海沟奇迹): 恢弘史诗交响和弦渐强 + 深海静谧尾奏淡出
+    """
+    import numpy as np
+
+    print(f"🎵 正在合成 {duration_sec:.1f} 秒深海探索纪录片立体声纯配乐 (无配音): {output_wav_path}")
+    num_samples = int(duration_sec * sample_rate)
+    t = np.linspace(0.0, duration_sec, num_samples, endpoint=False, dtype=np.float32)
+
+    left = np.zeros(num_samples, dtype=np.float32)
+    right = np.zeros(num_samples, dtype=np.float32)
+
+    # 1. 深海环境暖垫和弦进行 (C minor 9 -> Ab major 7 -> Fm9 -> G7sus4 -> Cmaj9 终章升华)
+    chords = [
+        # (start_ratio, end_ratio, frequencies_hz)
+        (0.00, 0.22, [130.81, 196.00, 246.94, 293.66, 392.00]),   # Act I: Cmaj9 明亮透射阳光
+        (0.22, 0.45, [110.00, 164.81, 220.00, 261.63, 329.63]),   # Act II-a: Am7 初入幽暗暮光带
+        (0.45, 0.68, [87.31,  130.81, 174.61, 207.65, 261.63]),   # Act II-b: Fm9 午夜带巨型生物与神秘深渊
+        (0.68, 0.85, [103.83, 155.56, 207.65, 261.63, 311.13]),   # Act III-a: AbMaj7 海沟荧光花园奇观
+        (0.85, 1.00, [130.81, 196.00, 261.63, 329.63, 392.00]),   # Act III-b: C Major 史诗升华与宁静尾声
+    ]
+
+    for start_r, end_r, freqs in chords:
+        s_idx = int(start_r * num_samples)
+        e_idx = int(end_r * num_samples)
+        seg_len = e_idx - s_idx
+        if seg_len <= 0:
+            continue
+        seg_t = t[s_idx:e_idx] - t[s_idx]
+        seg_dur = seg_len / sample_rate
+
+        # 柔和的交叉淡入淡出包络
+        fade_len = min(int(3.5 * sample_rate), seg_len // 3)
+        env = np.ones(seg_len, dtype=np.float32)
+        if fade_len > 0:
+            env[:fade_len] = np.linspace(0.0, 1.0, fade_len, dtype=np.float32) ** 1.5
+            env[-fade_len:] = np.linspace(1.0, 0.0, fade_len, dtype=np.float32) ** 1.5
+
+        for i, f in enumerate(freqs):
+            # 轻微失谐 (Detune) 与慢速 LFO 调制营造宽广的深海立体声包裹感
+            lfo_l = 0.5 + 0.5 * np.sin(2.0 * np.pi * (0.12 + 0.03 * i) * seg_t + i)
+            lfo_r = 0.5 + 0.5 * np.cos(2.0 * np.pi * (0.11 + 0.03 * i) * seg_t + i * 0.7)
+
+            wave_l = (
+                0.65 * np.sin(2.0 * np.pi * (f * 0.998) * seg_t)
+                + 0.25 * np.sin(2.0 * np.pi * (f * 2.001) * seg_t)
+                + 0.10 * np.sin(2.0 * np.pi * (f * 0.500) * seg_t)
+            )
+            wave_r = (
+                0.65 * np.sin(2.0 * np.pi * (f * 1.002) * seg_t + 0.4)
+                + 0.25 * np.sin(2.0 * np.pi * (f * 1.999) * seg_t + 0.8)
+                + 0.10 * np.sin(2.0 * np.pi * (f * 0.500) * seg_t)
+            )
+            amp = 0.12 / (1.0 + 0.2 * i)
+            left[s_idx:e_idx] += amp * env * lfo_l * wave_l
+            right[s_idx:e_idx] += amp * env * lfo_r * wave_r
+
+    # 2. 深海次声波低频脉动 (Sub-bass Drone, 55Hz ~ 65.4Hz)
+    sub_env = 0.5 + 0.5 * np.sin(2.0 * np.pi * 0.08 * t)
+    sub_wave = 0.18 * sub_env * np.sin(2.0 * np.pi * 65.41 * t)
+    left += sub_wave
+    right += sub_wave
+
+    # 3. 水下生物荧光水晶泛音点缀 (Bioluminescent Harp / Pluck Shimmers)
+    pentatonic_notes = [523.25, 587.33, 659.25, 783.99, 987.77, 1046.50, 1318.51]
+    rng = np.random.default_rng(seed=2026)
+    note_times = np.arange(1.5, duration_sec - 2.5, 2.25)
+    for idx, nt in enumerate(note_times):
+        n_start = int(nt * sample_rate)
+        n_dur = int(3.2 * sample_rate)
+        n_end = min(num_samples, n_start + n_dur)
+        actual_len = n_end - n_start
+        if actual_len <= 0:
+            continue
+        nt_arr = np.arange(actual_len, dtype=np.float32) / sample_rate
+        freq = pentatonic_notes[idx % len(pentatonic_notes)]
+        # 快速起音 + 长水下混响衰减
+        pluck_env = (1.0 - np.exp(-nt_arr * 25.0)) * np.exp(-nt_arr * 1.35)
+        shimmer = 0.06 * pluck_env * (
+            np.sin(2.0 * np.pi * freq * nt_arr)
+            + 0.4 * np.sin(2.0 * np.pi * (freq * 2.0) * nt_arr)
+        )
+        pan = 0.25 + 0.5 * rng.random()
+        left[n_start:n_end] += shimmer * pan
+        right[n_start:n_end] += shimmer * (1.0 - pan)
+
+    # 4. 远古空灵鲸歌共鸣 (Ethereal Whale Call Glissando, 在第 25s, 48s, 72s 出现)
+    for call_start in [22.0, 46.0, 68.0]:
+        if call_start + 6.0 >= duration_sec:
+            continue
+        c_s = int(call_start * sample_rate)
+        c_len = int(5.5 * sample_rate)
+        c_e = min(num_samples, c_s + c_len)
+        ct = np.arange(c_e - c_s, dtype=np.float32) / sample_rate
+        # 频率从 380Hz 缓慢滑向 240Hz 再回升
+        f_inst = 310.0 + 75.0 * np.cos(2.0 * np.pi * 0.18 * ct)
+        phase = 2.0 * np.pi * np.cumsum(f_inst) / sample_rate
+        c_env = np.sin(np.pi * ct / (ct[-1] + 1e-5)) ** 2
+        whale = 0.055 * c_env * (np.sin(phase) + 0.3 * np.sin(2.0 * phase))
+        left[c_s:c_e] += whale * 0.6
+        right[c_s:c_e] += whale * 0.8
+
+    # 5. 全局首尾渐入渐出 (3秒渐入，4秒渐出) 与防削波归一化
+    in_samples = min(int(3.0 * sample_rate), num_samples // 4)
+    out_samples = min(int(4.0 * sample_rate), num_samples // 4)
+    global_env = np.ones(num_samples, dtype=np.float32)
+    global_env[:in_samples] = np.linspace(0.0, 1.0, in_samples, dtype=np.float32)
+    global_env[-out_samples:] = np.linspace(1.0, 0.0, out_samples, dtype=np.float32)
+
+    left *= global_env
+    right *= global_env
+
+    peak = max(float(np.max(np.abs(left))), float(np.max(np.abs(right))), 1e-6)
+    left = (left / peak) * 0.85
+    right = (right / peak) * 0.85
+
+    stereo_pcm = np.empty((num_samples, 2), dtype=np.int16)
+    stereo_pcm[:, 0] = (left * 32767.0).astype(np.int16)
+    stereo_pcm[:, 1] = (right * 32767.0).astype(np.int16)
+
+    os.makedirs(os.path.dirname(os.path.abspath(output_wav_path)), exist_ok=True)
+    with wave.open(output_wav_path, "wb") as wf:
+        wf.setnchannels(2)
+        wf.setsampwidth(2)
+        wf.setframerate(sample_rate)
+        wf.writeframes(stereo_pcm.tobytes())
+
+    print(f"✅ 纪录片纯配乐合成完成: {output_wav_path}")
+    return output_wav_path
 
 
 def extract_last_frame(video_path: str, output_image_path: str):
@@ -39,47 +175,70 @@ def extract_last_frame(video_path: str, output_image_path: str):
     return img
 
 
-def concat_videos_ffmpeg(segment_paths: list[str], final_output_path: str):
-    """使用 FFmpeg 将多个 5 秒分镜无损合成 60 秒+ 完整长视频"""
+def concat_videos_with_bgm_ffmpeg(
+    segment_paths: list[str],
+    final_output_path: str,
+    bgm_wav_path: str | None = None,
+):
+    """使用 FFmpeg 将多个 5 秒分镜无损拼接，并混入深海纪录片立体声纯配乐"""
     list_file = os.path.join(os.path.dirname(final_output_path), "concat_list.txt")
     with open(list_file, "w", encoding="utf-8") as f:
         for seg in segment_paths:
             abs_seg = os.path.abspath(seg)
             f.write(f"file '{abs_seg}'\n")
 
-    cmd = [
-        "ffmpeg", "-y",
-        "-f", "concat",
-        "-safe", "0",
-        "-i", list_file,
-        "-c:v", "libx264",
-        "-pix_fmt", "yuv420p",
-        "-crf", "18",
-        "-preset", "fast",
-        final_output_path,
-    ]
+    if bgm_wav_path and os.path.exists(bgm_wav_path):
+        cmd = [
+            "ffmpeg", "-y",
+            "-f", "concat",
+            "-safe", "0",
+            "-i", list_file,
+            "-i", bgm_wav_path,
+            "-map", "0:v:0",
+            "-map", "1:a:0",
+            "-c:v", "libx264",
+            "-pix_fmt", "yuv420p",
+            "-crf", "18",
+            "-preset", "fast",
+            "-c:a", "aac",
+            "-b:a", "192k",
+            "-shortest",
+            final_output_path,
+        ]
+    else:
+        cmd = [
+            "ffmpeg", "-y",
+            "-f", "concat",
+            "-safe", "0",
+            "-i", list_file,
+            "-c:v", "libx264",
+            "-pix_fmt", "yuv420p",
+            "-crf", "18",
+            "-preset", "fast",
+            final_output_path,
+        ]
+
     subprocess.run(cmd, check=True)
-    print(f"🎬 1分钟+ 完整长视频已合成: {final_output_path}")
+    print(f"🎬 完整深海纪录片长视频（含立体声纯配乐）已合成: {final_output_path}")
 
 
 def run_ltx_pipeline(storyboard: dict, workspace_dir: str, force_rerun: bool = False):
     """
-    使用 Lightricks/LTX-Video (支持 T2V + I2V 尾帧接力) 渲染 60 秒+ 长视频
+    使用 Lightricks/LTX-Video (支持 T2V + I2V 尾帧接力) 渲染 90 秒深海探索纪录片
     针对 G4 / T4 / L4 GPU 开启显存卸载与 VAE 分块解码
     """
     import torch
-    from diffusers import LTXConditionPipeline, LTXPipeline
+    from diffusers import LTXConditionPipeline
     from diffusers.pipelines.ltx.pipeline_ltx_condition import LTXVideoCondition
-    from diffusers.utils import export_to_video, load_image
+    from diffusers.utils import export_to_video
 
     model_id = "Lightricks/LTX-Video"
-    print(f"🚀 正在加载视频大模型: {model_id} (首次运行将下载至 20TB Google Drive 缓存)...")
+    print(f"🚀 正在加载视频大模型: {model_id} (缓存于 20TB Google Drive)...")
 
     pipe = LTXConditionPipeline.from_pretrained(
         model_id,
         torch_dtype=torch.bfloat16,
     )
-    # 针对 16GB~24GB 显存开启 CPU Offload 与 VAE Tiling 防爆显存
     pipe.enable_model_cpu_offload()
     pipe.vae.enable_tiling()
 
@@ -87,31 +246,34 @@ def run_ltx_pipeline(storyboard: dict, workspace_dir: str, force_rerun: bool = F
     height = storyboard.get("resolution", {}).get("height", 512)
     fps = storyboard.get("fps", 24)
     seg_sec = storyboard.get("segment_seconds", 5)
-    # LTX-Video 帧数需满足 8 * k + 1，例如 5 秒 @ 24fps = 121 帧
     raw_frames = fps * seg_sec
     num_frames = ((raw_frames - 1) // 8) * 8 + 1
 
     global_style = storyboard.get("global_style", "")
     negative_prompt = storyboard.get("negative_prompt", "low quality, worst quality, deformed, distorted")
-    title = storyboard.get("title", "long_video")
+    title = storyboard.get("title", "Deep_Sea_Odyssey_90s")
 
     segments_dir = os.path.join(workspace_dir, "outputs", title, "segments")
     os.makedirs(segments_dir, exist_ok=True)
 
     shots = storyboard.get("shots", [])
+    total_duration = len(shots) * seg_sec
     segment_files = []
     prev_video_path = None
 
-    print(f"📋 开始渲染长视频《{title}》: 共 {len(shots)} 个镜头, 单镜头 {seg_sec}s ({num_frames} 帧), 预计总时长 {len(shots) * seg_sec} 秒")
+    print(
+        f"🌊 开始渲染深海探索纪录片《{title}》: 共 {len(shots)} 个镜头, "
+        f"单镜头 {seg_sec}s ({num_frames} 帧), 总时长 {total_duration} 秒 (纯配乐无配音)"
+    )
 
     for idx, shot in enumerate(shots, start=1):
         shot_id = shot.get("id", idx)
+        act_name = shot.get("act", "")
         seg_path = os.path.join(segments_dir, f"shot_{shot_id:03d}.mp4")
         last_frame_path = os.path.join(segments_dir, f"shot_{shot_id:03d}_last.png")
 
-        # 断点续传检测：如果分镜已存在于 Google Drive，直接复用
         if os.path.exists(seg_path) and not force_rerun:
-            print(f"⏭️ [镜头 {idx}/{len(shots)}] 已存在于云盘，跳过渲染: {seg_path}")
+            print(f"⏭️ [镜头 {idx}/{len(shots)}] ({act_name}) 已存在于云盘，跳过渲染: {seg_path}")
             segment_files.append(seg_path)
             prev_video_path = seg_path
             continue
@@ -120,10 +282,10 @@ def run_ltx_pipeline(storyboard: dict, workspace_dir: str, force_rerun: bool = F
         chain_prev = shot.get("chain_from_previous", False) and (prev_video_path is not None)
 
         t0 = time.time()
-        generator = torch.Generator("cpu").manual_seed(42 + shot_id)
+        generator = torch.Generator("cpu").manual_seed(100 + shot_id)
 
         if chain_prev:
-            print(f"🔗 [镜头 {idx}/{len(shots)}] 尾帧接力模式 (I2V): 提取上一镜头尾帧继续运镜...")
+            print(f"🔗 [镜头 {idx}/{len(shots)}] ({act_name}) 尾帧接力模式 (I2V): 承接上一镜头连续下潜...")
             cond_img = extract_last_frame(prev_video_path, last_frame_path)
             condition = LTXVideoCondition(image=cond_img, frame_index=0)
             video_frames = pipe(
@@ -138,7 +300,7 @@ def run_ltx_pipeline(storyboard: dict, workspace_dir: str, force_rerun: bool = F
                 generator=generator,
             ).frames[0]
         else:
-            print(f"🎬 [镜头 {idx}/{len(shots)}] 独立新场景模式 (T2V): 渲染全新分镜...")
+            print(f"🎬 [镜头 {idx}/{len(shots)}] ({act_name}) 独立新场景模式 (T2V): 渲染深海新分镜...")
             video_frames = pipe(
                 conditions=None,
                 prompt=full_prompt,
@@ -158,19 +320,23 @@ def run_ltx_pipeline(storyboard: dict, workspace_dir: str, force_rerun: bool = F
         segment_files.append(seg_path)
         prev_video_path = seg_path
 
-        # 释放显存碎片
         gc.collect()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-    final_output = os.path.join(workspace_dir, "outputs", f"{title}_full_{len(shots)*seg_sec}s.mp4")
-    concat_videos_ffmpeg(segment_files, final_output)
+    bgm_wav = None
+    if storyboard.get("bgm_enabled", True):
+        bgm_wav = os.path.join(workspace_dir, "outputs", title, f"{title}_bgm_{total_duration}s.wav")
+        generate_deep_sea_soundtrack(float(total_duration), bgm_wav)
+
+    final_output = os.path.join(workspace_dir, "outputs", f"{title}_full_{total_duration}s.mp4")
+    concat_videos_with_bgm_ffmpeg(segment_files, final_output, bgm_wav_path=bgm_wav)
     return final_output
 
 
 def run_wan_pipeline(storyboard: dict, workspace_dir: str, force_rerun: bool = False):
     """
-    使用阿里通义万相 Wan-AI/Wan2.1-T2V-1.3B-Diffusers 渲染高画质多分镜长视频
+    使用阿里通义万相 Wan-AI/Wan2.1-T2V-1.3B-Diffusers 渲染高画质多分镜深海纪录片
     """
     import torch
     from diffusers import AutoencoderKLWan, WanPipeline
@@ -187,16 +353,17 @@ def run_wan_pipeline(storyboard: dict, workspace_dir: str, force_rerun: bool = F
     height = storyboard.get("resolution", {}).get("height", 480)
     fps = storyboard.get("fps", 16)
     seg_sec = storyboard.get("segment_seconds", 5)
-    num_frames = 81  # Wan2.1 标准 81 帧 (~5s @ 16fps)
+    num_frames = 81
 
     global_style = storyboard.get("global_style", "")
     negative_prompt = storyboard.get("negative_prompt", "")
-    title = storyboard.get("title", "long_video_wan")
+    title = storyboard.get("title", "Deep_Sea_Odyssey_90s_Wan")
 
     segments_dir = os.path.join(workspace_dir, "outputs", title, "segments")
     os.makedirs(segments_dir, exist_ok=True)
 
     shots = storyboard.get("shots", [])
+    total_duration = len(shots) * seg_sec
     segment_files = []
 
     for idx, shot in enumerate(shots, start=1):
@@ -228,27 +395,39 @@ def run_wan_pipeline(storyboard: dict, workspace_dir: str, force_rerun: bool = F
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-    final_output = os.path.join(workspace_dir, "outputs", f"{title}_full_{len(shots)*seg_sec}s.mp4")
-    concat_videos_ffmpeg(segment_files, final_output)
+    bgm_wav = None
+    if storyboard.get("bgm_enabled", True):
+        bgm_wav = os.path.join(workspace_dir, "outputs", title, f"{title}_bgm_{total_duration}s.wav")
+        generate_deep_sea_soundtrack(float(total_duration), bgm_wav)
+
+    final_output = os.path.join(workspace_dir, "outputs", f"{title}_full_{total_duration}s.mp4")
+    concat_videos_with_bgm_ffmpeg(segment_files, final_output, bgm_wav_path=bgm_wav)
     return final_output
 
 
 def main():
-    parser = argparse.ArgumentParser(description="1分钟+ AI 长视频生成流水线")
+    parser = argparse.ArgumentParser(description="90秒深海探索纪录片 AI 长视频生成流水线")
     parser.add_argument("--storyboard", type=str, default="storyboard.json", help="分镜剧本 JSON 路径")
     parser.add_argument("--engine", type=str, choices=["ltx", "wan"], default=None, help="覆盖模型引擎 (ltx 或 wan)")
-    parser.add_argument("--max-shots", type=int, default=0, help="限制渲染前 N 个镜头 (0=全部渲染，用于快速测试)")
+    parser.add_argument("--max-shots", type=int, default=0, help="限制渲染前 N 个镜头 (0=全部 18 个镜头共 90 秒)")
+    parser.add_argument("--bgm-only", type=str, default="", help="仅生成指定路径的 90 秒深海纯配乐 WAV 并退出")
     parser.add_argument("--force", action="store_true", help="强制重新渲染所有分镜（忽略断点缓存）")
     args = parser.parse_args()
-
-    workspace_dir = os.getcwd()
-    setup_drive_cache(workspace_dir)
 
     with open(args.storyboard, "r", encoding="utf-8") as f:
         storyboard = json.load(f)
 
     if args.max_shots > 0:
         storyboard["shots"] = storyboard["shots"][:args.max_shots]
+
+    total_sec = len(storyboard.get("shots", [])) * storyboard.get("segment_seconds", 5)
+
+    if args.bgm_only:
+        generate_deep_sea_soundtrack(float(total_sec), args.bgm_only)
+        return
+
+    workspace_dir = os.getcwd()
+    setup_drive_cache(workspace_dir)
 
     engine = args.engine or storyboard.get("engine", "ltx")
     if engine == "wan":
@@ -257,7 +436,7 @@ def main():
         final_video = run_ltx_pipeline(storyboard, workspace_dir, force_rerun=args.force)
 
     print("========================================================")
-    print(f"🎉 长视频生成任务全部完成！")
+    print("🎉 90秒深海探索纪录片（纯配乐版）全部生成完成！")
     print(f"📁 完整成片路径 (Google Drive): {final_video}")
     print("👉 在 Antigravity VM 中执行 `bash ./colab-sync.sh pull` 即可拉取到本地。")
     print("========================================================")
