@@ -9,6 +9,8 @@ WORKSPACE_NAME="Antigravity_Workspace"
 COLAB_FOLDER_NAME="Colab Notebooks"
 NOTEBOOK_LOCAL="colab/Antigravity_GPU_Worker.ipynb"
 TASK_SCRIPT_LOCAL="colab/gpu_task.py"
+VIDEO_PIPELINE_LOCAL="colab/long_video_pipeline.py"
+STORYBOARD_LOCAL="colab/storyboard.json"
 STATE_FILE=".colab_drive_state.env"
 
 ensure_gdrive() {
@@ -98,7 +100,7 @@ upload_or_update_file() {
 cmd_init() {
     ensure_gdrive
     echo "========================================================"
-    echo "🚀 正在初始化 Google Drive (20TB) + Colab GPU 协同环境..."
+    echo "🚀 正在初始化 Google Drive (20TB) + Colab GPU 长视频工作站..."
     echo "========================================================"
 
     COLAB_DIR_ID=$(get_or_create_folder "$COLAB_FOLDER_NAME")
@@ -111,10 +113,16 @@ cmd_init() {
     echo "✅ 云端输出目录 [$WORKSPACE_NAME/outputs] ID: $OUTPUTS_DIR_ID"
 
     NOTEBOOK_ID=$(upload_or_update_file "$NOTEBOOK_LOCAL" "$COLAB_DIR_ID" "application/vnd.google.colaboratory")
-    echo "✅ Colab GPU 笔记本已部署 ID: $NOTEBOOK_ID"
+    echo "✅ Colab GPU 笔记本已更新 ID: $NOTEBOOK_ID"
 
     TASK_ID=$(upload_or_update_file "$TASK_SCRIPT_LOCAL" "$WORKSPACE_DIR_ID")
-    echo "✅ GPU 任务脚本 [gpu_task.py] 已同步 ID: $TASK_ID"
+    echo "✅ GPU 基准脚本 [gpu_task.py] 已同步 ID: $TASK_ID"
+
+    VIDEO_PIPELINE_ID=$(upload_or_update_file "$VIDEO_PIPELINE_LOCAL" "$WORKSPACE_DIR_ID")
+    echo "✅ 1分钟+ 长视频流水线 [long_video_pipeline.py] 已同步 ID: $VIDEO_PIPELINE_ID"
+
+    STORYBOARD_ID=$(upload_or_update_file "$STORYBOARD_LOCAL" "$WORKSPACE_DIR_ID")
+    echo "✅ 60秒分镜剧本 [storyboard.json] 已同步 ID: $STORYBOARD_ID"
 
     cat > "$STATE_FILE" <<EOF
 COLAB_DIR_ID=$COLAB_DIR_ID
@@ -122,11 +130,12 @@ WORKSPACE_DIR_ID=$WORKSPACE_DIR_ID
 OUTPUTS_DIR_ID=$OUTPUTS_DIR_ID
 NOTEBOOK_ID=$NOTEBOOK_ID
 TASK_ID=$TASK_ID
+VIDEO_PIPELINE_ID=$VIDEO_PIPELINE_ID
+STORYBOARD_ID=$STORYBOARD_ID
 EOF
 
     echo ""
-    echo "🎉 部署完成！可在 Google Colab (GPU) 中直接打开运行："
-    echo "👉 https://colab.research.google.com/drive/$NOTEBOOK_ID"
+    echo "🎉 长视频工作站部署完成！"
     echo "========================================================"
 }
 
@@ -186,7 +195,7 @@ cmd_pull() {
         OUTPUTS_DIR_ID=$(get_or_create_folder "outputs" "$WORKSPACE_DIR_ID")
     fi
     mkdir -p ./colab/outputs
-    echo "📥 正在从 Google Drive [$WORKSPACE_NAME/outputs] 拉取 GPU 计算结果..."
+    echo "📥 正在从 Google Drive [$WORKSPACE_NAME/outputs] 拉取生成的视频与结果..."
     local files_json
     files_json=$(gdrive readonly ls "$OUTPUTS_DIR_ID" --max 50 --json 2>/dev/null || echo "[]")
     python3 - "$files_json" <<'PYEOF'

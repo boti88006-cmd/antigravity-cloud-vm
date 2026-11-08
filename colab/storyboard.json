@@ -1,0 +1,86 @@
+{
+  "title": "Cyberpunk_Odyssey_60s",
+  "engine": "ltx",
+  "resolution": {
+    "width": 768,
+    "height": 512
+  },
+  "fps": 24,
+  "segment_seconds": 5,
+  "global_style": "cinematic, photorealistic, 8k resolution, volumetric lighting, masterpiece, smooth camera motion, anamorphic lens",
+  "negative_prompt": "low quality, worst quality, deformed, distorted, disfigured, motion smear, motion artifacts, fused fingers, bad anatomy, weird hand, ugly, watermark, text",
+  "shots": [
+    {
+      "id": 1,
+      "duration": 5,
+      "chain_from_previous": false,
+      "prompt": "Aerial drone establishing shot flying through a futuristic cyberpunk metropolis at night, neon holograms reflecting on wet glass skyscrapers, flying vehicles streaking through rain"
+    },
+    {
+      "id": 2,
+      "duration": 5,
+      "chain_from_previous": true,
+      "prompt": "The camera dives smoothly downward from the skyscrapers into a bustling neon-lit street market, steam rising from street food stalls, pedestrians holding glowing umbrellas"
+    },
+    {
+      "id": 3,
+      "duration": 5,
+      "chain_from_previous": true,
+      "prompt": "Tracking shot following a lone cybernetic detective in a dark trench coat walking through the crowded rain-soaked alley, neon signs flickering in puddles"
+    },
+    {
+      "id": 4,
+      "duration": 5,
+      "chain_from_previous": true,
+      "prompt": "The detective pauses in front of a massive holographic projection of a digital AI goddess floating in the center of the plaza, glowing cyan particles drifting in the air"
+    },
+    {
+      "id": 5,
+      "duration": 5,
+      "chain_from_previous": true,
+      "prompt": "Close-up panning shot as the detective enters a high-tech underground laboratory, rows of quantum server racks pulsing with golden fiber-optic light"
+    },
+    {
+      "id": 6,
+      "duration": 5,
+      "chain_from_previous": true,
+      "prompt": "Inside the lab, a translucent 3D star map of the galaxy unfolds in mid-air, rotating slowly with glowing trajectories and orbital rings"
+    },
+    {
+      "id": 7,
+      "duration": 5,
+      "chain_from_previous": false,
+      "prompt": "Cut to an orbital space elevator rising above the Earth's atmosphere at dawn, sunlight gleaming off metallic cables, curvature of the Earth with glowing city grids below"
+    },
+    {
+      "id": 8,
+      "duration": 5,
+      "chain_from_previous": true,
+      "prompt": "The camera glides alongside a sleek silver spacecraft docking at the orbital ring station, thruster plumes illuminating the dark void of space"
+    },
+    {
+      "id": 9,
+      "duration": 5,
+      "chain_from_previous": true,
+      "prompt": "Interior view from the cockpit window as the spacecraft engages warp drive, stars stretching into vibrant streaks of blue and violet hyperspace light"
+    },
+    {
+      "id": 10,
+      "duration": 5,
+      "chain_from_previous": false,
+      "prompt": "Emerging from hyperspace above an alien ocean world with twin moons and glowing bioluminescent rings in the sky, dramatic cosmic nebula background"
+    },
+    {
+      "id": 11,
+      "duration": 5,
+      "chain_from_previous": true,
+      "prompt": "Sweeping low-altitude flight over crystal-clear alien ocean waves, towering crystalline spires rising from the water under golden twilight clouds"
+    },
+    {
+      "id": 12,
+      "duration": 5,
+      "chain_from_previous": true,
+      "prompt": "Final slow pull-back shot revealing a futuristic glass citadel built atop the highest crystal spire, twin moons aligning on the horizon, epic cinematic ending"
+    }
+  ]
+}
