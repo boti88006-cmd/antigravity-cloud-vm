@@ -24,10 +24,33 @@ free -h 2>/dev/null || vm_stat
 echo ""
 
 echo "🔹 [4] 磁盘容量与挂载点 (Disk Storage):"
-df -h /
+df -h / /home/antigravity /shared 2>/dev/null | awk 'NR==1 || !seen[$0]++' || df -h /
 echo ""
 
-echo "🔹 [5] 预装开发工具链版本 (Toolchain):"
+echo "🔹 [5] Google Drive 云盘挂载与配额 (Cloud Drive):"
+if command -v gdrive >/dev/null 2>&1; then
+    GDRIVE_BIN_DIR="${ANTIGRAVITY_APP_DATA_DIR:-$HOME/.gemini/jetski}/plugin_data/gdrive/bin"
+    if ! ls "$GDRIVE_BIN_DIR"/gdrive-* >/dev/null 2>&1; then
+        gdrive --version >/dev/null 2>&1 || true
+        TMP_BIN=$(ls -t "$GDRIVE_BIN_DIR"/.gdrive.tmp.* 2>/dev/null | head -n 1 || true)
+        CLI_VER=$(grep -E "^CLI_VERSION=" /opt/antigravity/bin/gdrive 2>/dev/null | cut -d= -f2 || echo "1013145354")
+        if [ -n "$TMP_BIN" ] && [ -f "$TMP_BIN" ]; then
+            mv -f "$TMP_BIN" "$GDRIVE_BIN_DIR/gdrive-$CLI_VER" 2>/dev/null || true
+            rm -f "$GDRIVE_BIN_DIR"/.gdrive.tmp.* 2>/dev/null || true
+        fi
+    fi
+    if gdrive auth status >/dev/null 2>&1; then
+        echo "  - 状态 : 已连接 (Logged in)"
+        gdrive readonly quota 2>/dev/null | sed 's/^/  - /' || true
+    else
+        echo "  - 状态 : 未登录或授权已过期"
+    fi
+else
+    echo "  - 状态 : 未检测到 gdrive CLI"
+fi
+echo ""
+
+echo "🔹 [6] 预装开发工具链版本 (Toolchain):"
 echo "  - Node.js : $(node -v 2>/dev/null || echo '未安装')"
 echo "  - Python3 : $(python3 --version 2>/dev/null || echo '未安装')"
 echo "  - Git     : $(git --version 2>/dev/null || echo '未安装')"
